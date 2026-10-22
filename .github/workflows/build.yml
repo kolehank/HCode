@@ -1,0 +1,224 @@
+# HCode fork 三平台打包验证（Windows / macOS / Linux）。
+#
+# 触发：
+#   - 手动（workflow_dispatch）：Actions 页面 Run workflow，可选跳过 CLI SEA 构建
+#   - 推送 v* 标签：打全部平台安装包并上传到 GitHub Release
+#
+# 产物：
+#   - 桌面安装包：Windows nsis .exe / macOS .dmg+.zip（未签名）/ Linux AppImage+deb+rpm+pacman
+#   - CLI SEA 单文件二进制：zcode-<platform>-<arch>（单 runner 交叉产出全部 6 个目标）
+#
+# 与 kolehank/ZCode 参考版差异（按本仓库实际情况适配）：
+#   - 无 fork:guard / CUA check:integrity 脚本，门禁只保留 lint / typecheck / 单测
+#   - 无 ZCODE_SKIP_REMOTE_ASSETS 环境变量；desktop 打包链路不构建 remote assets
+#   - native-search 依赖走仓库内置归档（apps/zcode-cli/dependencies/native-search），
+#     未配置内网源时 prepare 脚本自动回退 repository 来源
+#   - 打包入口复用仓库既有编排：`pnpm bundle:desktop -- <mac|win|linux> <x64|arm64>`
+#     （内部 = prepare runtime assets + 生产构建 + electron-builder + 产物机械校验）
+#   - macOS 默认出未签名包；需要签名时设 ZCODE_ENABLE_MAC_SIGN=1 并提供
+#     APPLE_SIGNING_IDENTITY / CSC_NAME（electron-builder.config.js 已预留钩子）
+
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_gate:
+        description: "跳过门禁（lint/typecheck/test），直接打包"
+        type: boolean
+        default: false
+      skip_cli:
+        description: "跳过 CLI SEA 二进制构建（只出桌面安装包）"
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24.14.0"
+  PNPM_VERSION: "10.33.2"
+  # 产物身份：缺省（test）会打出 Preview 测试包（-TEST 后缀）；
+  # fork 出正式包必须显式声明 production。
+  ZCODE_ENV: "production"
+
+jobs:
+  gate:
+    name: 门禁（lint / typecheck / test）
+    if: ${{ github.event_name == 'push' || !inputs.skip_gate }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        run: npm install -g pnpm@${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # bootstrap 的 officialPluginDefinitions 对照测试在运行时 import
+      # @zcode/contracts（official-plugin-definitions.ts 本身依赖它），其 exports
+      # 指向 dist/——根 typecheck 不构建 apps/zcode-cli 下的包，全新检出必须先
+      # 构建一次，否则 pnpm -r test 在 bootstrap 处中断（pnpm -r 遇错即停）。
+      - name: 构建 @zcode/contracts（bootstrap 测试依赖其 dist）
+        run: pnpm --dir apps/zcode-cli/packages/contracts build
+
+      - name: 单元测试
+        run: pnpm test
+
+  desktop:
+    name: 桌面安装包（${{ matrix.platform }} ${{ matrix.arch }}）
+    needs: gate
+    # gate 被 skip 时（手动跳过门禁）也要能直接跑打包
+    if: ${{ always() && !failure() && !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            arch: x64
+          - os: macos-latest
+            platform: mac
+            arch: arm64
+          - os: ubuntu-22.04
+            platform: linux
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    env:
+      # fork 无签名证书：禁止 electron-builder 在 macOS 上做签名身份自动发现（否则直接失败）。
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        run: npm install -g pnpm@${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 安装 Linux 打包系统依赖
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          # bsdtar(libarchive-tools)：fpm 的 pacman target 生成 .MTREE 必需（runner 默认无此命令）
+          # rpmbuild(rpm) + xz-utils：rpm target 由 fpm 调用系统 rpmbuild 产出，xz 压缩依赖系统 xz
+          sudo apt-get install -y libarchive-tools rpm xz-utils
+
+      - name: 构建 workspace 包（desktop 除外）
+        run: pnpm build:bootstrap
+
+      - name: 打包桌面安装包
+        run: pnpm bundle:desktop -- ${{ matrix.platform }} ${{ matrix.arch }}
+
+      - name: 收集安装包
+        shell: bash
+        run: |
+          mkdir -p release-artifacts
+          found=0
+          while IFS= read -r -d '' file; do
+            found=1
+            cp "$file" release-artifacts/
+          done < <(find packages/desktop/dist -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.pkg.tar.zst" \) -print0 2>/dev/null)
+          if [ "$found" -ne 1 ]; then
+            echo "::error::未找到任何安装包产物"; exit 1;
+          fi
+          ls -lh release-artifacts/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: release-artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+
+  cli:
+    name: CLI SEA 二进制（全平台，单 runner 交叉产出）
+    needs: gate
+    if: ${{ always() && !failure() && !cancelled() && (github.event_name == 'push' || !inputs.skip_cli) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        run: npm install -g pnpm@${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      # 根编排前置：build:bootstrap 构建有 build script 的根包；@zcode/shared 无 build
+      # script（exports 直指 src/*.ts），其 dist/*.js 是根 typecheck（tsc -b composite）
+      # 的发射副产品——SEA 的 TUI 闭包扫描要求依赖包存在 dist/index.js，故先跑 typecheck。
+      - name: 构建 CLI SEA 单文件二进制
+        run: |
+          pnpm build:bootstrap
+          pnpm typecheck
+          pnpm build:sea
+
+      - name: 收集 SEA 二进制
+        run: |
+          mkdir -p sea-artifacts
+          found=0
+          while IFS= read -r -d '' file; do
+            found=1
+            cp "$file" sea-artifacts/
+          done < <(find apps/zcode-cli/packages/cli/dist -maxdepth 1 -type f -name "zcode-*" -print0 2>/dev/null)
+          if [ "$found" -ne 1 ]; then
+            echo "::error::未找到 SEA 二进制产物"; exit 1;
+          fi
+          ls -lh sea-artifacts/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-sea
+          path: sea-artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: 上传到 GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop, cli]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: 上传产物到 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes || true
+          gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
