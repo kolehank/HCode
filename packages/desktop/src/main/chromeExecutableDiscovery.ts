@@ -254,6 +254,11 @@ export async function resolveChromeExecutablePath(
   options: ChromeExecutableDiscoveryOptions = {},
 ): Promise<string | null> {
   const platform = options.platform ?? process.platform;
+  // 与 readRunningChromeProcessCommandLines/readRegisteredChromeExecutablePaths 同一口径：
+  // 不支持的平台一律返回 null（调用方报 chrome_executable_not_found），不能继续走
+  // Linux 标准安装路径回退——否则在装了 Chrome 的机器上（如 CI runner）测试注入的
+  // 不支持平台会被当作 Linux 处理，导致“应当找不到 Chrome”的断言被真实安装穿透。
+  if (!SUPPORTED_PLATFORMS.has(platform)) return null;
   const env = options.env ?? process.env;
   const commandLines =
     options.processCommandLines ??

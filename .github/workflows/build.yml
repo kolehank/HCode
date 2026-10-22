@@ -92,11 +92,8 @@ jobs:
           pnpm --dir apps/zcode-cli/packages/dynamic-workflow build
           pnpm --dir apps/zcode-cli/packages/adapters build
 
-      # browserDataManager 的“找不到 Chrome”用例以 platform:"aix" 断言 chrome_executable_not_found，
-      # 但发现逻辑对非 darwin/win32 平台回退 Linux 标准路径；GitHub Linux runner 预装
-      # Google Chrome，断言必然落空。这是测试的环境假设问题，跳过该文件，不阻塞打包验证。
       - name: 单元测试
-        run: pnpm exec vitest run --exclude "packages/desktop/test/e2e/**/*.test.ts" --exclude "packages/desktop/test/browserDataManager.test.ts"
+        run: pnpm test
 
   desktop:
     name: 桌面安装包（${{ matrix.platform }} ${{ matrix.arch }}）
