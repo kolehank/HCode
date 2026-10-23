@@ -18,11 +18,6 @@ import {
 } from "@zcode/shared";
 import { zcodeMcpUiSamplingResultSchema } from "@zcode/shared";
 import { MCP_APPS_SAMPLING_TRANSPORT_TIMEOUT_MS } from "@zcode/shared/mcp-apps";
-import {
-  channelReplyRequestSchema,
-  type ChannelReplyHostRequest,
-  type ChannelReplyResult,
-} from "@zcode/shared";
 import { requestPluginReferenceCatalog } from "#src/zcode-agent/pluginReferenceCatalogRequest.js";
 import {
   localTtftFactsSchema,
@@ -1073,7 +1068,6 @@ interface CreateZCodeAgentServiceOptions extends Omit<
    * browser 命令返回 backend_unavailable，不影响其它功能。
    */
   browserControlExecutor?: BrowserAmbientContextExecutor;
-  channelReplyExecutor?: (request: ChannelReplyHostRequest) => Promise<ChannelReplyResult>;
   topicResourceExecutor?: (
     request: ZCodeTopicResourceReadParams &
       ZCodeAgentWorkspaceTarget & { trace?: ZCodeProtocolTrace },
@@ -2443,31 +2437,6 @@ export function createZCodeAgentService(
             await client.respond(request.id, configuration);
           })().catch((error) =>
             logger.debug(undefined, "Subagent 配置响应发送失败", { error: String(error) }),
-          );
-          return;
-        }
-        if (request.method === zcodeProtocolMethods.channelReply) {
-          void (async () => {
-            const params = channelReplyRequestSchema.parse(request.params);
-            if (!options?.channelReplyExecutor) throw new Error("Channel reply unavailable");
-            const active = activeClientsByWorkspaceKey.get(resolveWorkspaceKey(workspace));
-            if (active?.client !== client)
-              throw new Error("Channel reply client is no longer active");
-            const currentWorkspace = active.workspace;
-            const result = await options.channelReplyExecutor({
-              ...params,
-              // 活跃连接还携带 V4 envelope 等内部字段；跨回复契约只能投影工作区身份，不能展开整个对象。
-              workspacePath: currentWorkspace.workspacePath,
-              workspaceIdentity: currentWorkspace.workspaceIdentity,
-              remoteSessionId: currentWorkspace.remoteSessionId,
-              trace: request.trace,
-            });
-            await client.respond(request.id, result);
-          })().catch((error: unknown) =>
-            client.respondError(request.id, {
-              code: -32603,
-              message: error instanceof Error ? error.message : "Channel reply failed",
-            }),
           );
           return;
         }

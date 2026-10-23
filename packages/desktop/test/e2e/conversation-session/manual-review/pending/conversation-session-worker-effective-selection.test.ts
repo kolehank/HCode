@@ -2,10 +2,6 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { BUILTIN_MODEL_PROVIDER_IDS, encodeCustomModelValue, generateTraceId } from "@zcode/shared";
 import { createWorkerSelectionIntegration } from "../../../helpers/worker-selection-integration.js";
-import {
-  createBotsServiceHarness,
-  createFeishuConfig,
-} from "../../../bots/helpers/bots-service-harness.js";
 import { clearAppData, getE2EAppDataPaths } from "../../../helpers/desktop-app.js";
 import {
   restartIntoWorkspace,
@@ -98,7 +94,7 @@ describe("Todo99 Worker 有效选择真实执行", () => {
     expect(await readFile(profilePath, "utf8")).toBe(originalProfile);
   });
 
-  it("W99-E02/03/06: 绑定 Bot 的下一轮、附件和立即设置贯穿真实 Host/Worker", async function () {
+  it("W99-E02/03/06: 下一轮、附件和立即设置贯穿真实 Host/Worker", async function () {
     this.timeout(180000);
     const host = await createWorkerSelectionIntegration();
     try {
@@ -117,35 +113,6 @@ describe("Todo99 Worker 有效选择真实执行", () => {
         deferPersistenceUntilFirstPrompt: true,
       });
       const target = { workspacePath: host.workspacePath, sessionId: created.taskId };
-      const harness = createBotsServiceHarness({
-        config: createFeishuConfig(),
-        state: {
-          version: 3,
-          bots: {
-            "feishu-e2e": {
-              botId: "feishu-e2e",
-              workspacePath: host.workspacePath,
-              mode: "task",
-              activeTaskId: created.taskId,
-              updatedAt: 1,
-            },
-          },
-        },
-        modelSelectionService: host.modelSelectionService,
-      });
-      // 只替换测试 harness 的 task port；以下读取、命令、发送、订阅均为生产 adapter。
-      Object.assign(harness.zcodeTaskService, host.task);
-      const sendBot = (text: string) =>
-        harness.service.handleInboundMessage({
-          botId: "feishu-e2e",
-          actor: {
-            provider: "feishu",
-            botId: "feishu-e2e",
-            providerUserId: "ou_e2e_user",
-            chatType: "private",
-          },
-          text,
-        });
       const debugDir = join(host.home, ".zcode/cli/debug");
       async function waitRequest(marker: string) {
         let result: ModelIoRecord | undefined;
@@ -178,19 +145,21 @@ describe("Todo99 Worker 有效选择真实执行", () => {
         );
         await host.selectAccount(effective.providerId);
         expect(await host.task.getTaskModelSelection({ taskId: created.taskId })).toEqual(original);
-        await sendBot("E2E_W99_BOT_NEXT");
+        await host.task.sendPrompt({
+          taskId: created.taskId,
+          content: "E2E_W99_BOT_NEXT",
+          traceId: generateTraceId("w99"),
+        });
         const next = await waitRequest("E2E_W99_BOT_NEXT");
         expect(next.model.providerId).toBe(effective.providerId);
         expect(next.request.body).toMatchObject({ output_config: { effort: "high" } });
-        expect(harness.readState().bots["feishu-e2e"]?.draftOptions).toBeUndefined();
 
-        await sendBot(`/model ${encodeCustomModelValue(effective.providerId, effective.modelId)}`);
-        expect(
-          (await host.task.getTaskModelSelection({ taskId: created.taskId }))?.options
-            ?.reasoningLevel,
-        ).toBe("max");
         // 单独设置档位是已提交的 Session 命令，必须立刻保存，不等下一条消息。
-        await sendBot("/think low");
+        await host.task.setModel({
+          taskId: created.taskId,
+          traceId: generateTraceId("w99"),
+          modelSelection: { ...effective, options: { reasoningLevel: "low" } },
+        });
         expect(await host.task.getTaskModelSelection({ taskId: created.taskId })).toEqual({
           ...effective,
           options: { reasoningLevel: "low" },
@@ -250,7 +219,7 @@ describe("Todo99 Worker 有效选择真实执行", () => {
             ?.reasoningLevel,
         ).toBe("low");
       } finally {
-        harness.service.disposeAll();
+        await host.dispose();
       }
     } finally {
       await host.dispose();

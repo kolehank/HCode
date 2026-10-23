@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 // 共享焦点测试证明 Host 行为；此清单核对不可恢复的业务入口确实提交破坏性意图，
 // 防止旧调用只写删除文案，却绕过取消默认焦点与键盘保护。
 const destructiveEntries = [
-  ["BotsDialog.tsx", "bots.deleteConfirmTitle"],
   ["project-sidebar/useArchiveManagement.ts", "archives.deleteTitle"],
   // V2 已移除刷新配对入口；无刷新按钮由 webRemoteControlDialogLayout 回归覆盖。
   ["settings/CommandsSection.tsx", "settings.commands.delete.title"],

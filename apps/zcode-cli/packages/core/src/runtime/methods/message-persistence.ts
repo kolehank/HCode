@@ -123,8 +123,7 @@ export async function persistUserPrompt(
       text: withConversationQuotes(
         input,
         options?.intent?.conversationQuotes,
-        options?.intent?.botGroupSource,
-      ),
+),
       time: {
         start: created,
         end: created,

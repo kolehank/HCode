@@ -1,5 +1,5 @@
 import { conversationQuotesSchema } from "../conversationSelection.js";
-import { botGroupInputSourceSchema } from "../bots.js";
+import { botGroupInputSourceSchema } from "./bot-source.js";
 // CLI admission 后的自包含输入事实。
 // queue / guide / runtime / transcript 只能携带同一个 intent，不允许各层重建字段。
 import { z } from "zod";

@@ -695,8 +695,7 @@ export async function executeTurnCommand(
               withConversationQuotes(
                 input,
                 options?.intent?.conversationQuotes,
-                options?.intent?.botGroupSource,
-              ),
+),
               resolvedAttachments,
               {
                 browserAmbientContext: options?.browserAmbientContext,

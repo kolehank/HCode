@@ -1,7 +1,5 @@
 import { requestVerificationReasons } from "../request-security-edition/verification-policy.js";
 import { zcodeProtocolTraceSchema } from "./trace.js";
-// Bot 反向回复的名字解析/待澄清结果与 App、CLI 使用同一严格 schema。
-export { channelReplyRequestSchema, channelReplyResultSchema } from "../channel-mention.js";
 export { zcodeProtocolTraceSchema, type ZCodeProtocolTrace } from "./trace.js";
 import {
   databaseMigrationFactsSchema,
@@ -34,7 +32,7 @@ export { conversationQuoteSchema, conversationQuotesSchema } from "../conversati
 import { z } from "zod";
 import { accountProviderUnavailableReasonSchema } from "../account-provider-state.js";
 import { bashOutputDisplaySchema } from "../bash-output-display.js";
-import { zcodeAutomationBotDeliveryTargetSchema } from "../bots.js";
+import { zcodeAutomationBotDeliveryTargetSchema } from "../zcode-protocol-v4/bot-source.js";
 import { executionOutputPreviewSchema } from "../execution-output-preview.js";
 import { completeModelPropertiesDataSchema } from "../model-config.js";
 import { modelExecutionSchema } from "../model-execution.js";
@@ -4214,7 +4212,6 @@ export const zcodeProtocolMethods = {
   pluginsDescribe: "plugins/describe",
   automationCreate: "automation/create",
   topicResourceRead: "topic/resource/read",
-  channelReply: "bot/channel/reply",
   topicResourceCancel: "topic/resource/cancel",
   automationUpdate: "automation/update",
   automationCheckTaskBinding: "automation/checkTaskBinding",
@@ -4372,10 +4369,10 @@ export {
   botTopicInputMessageSchema,
   botGroupInputSourceSchema,
   type BotGroupInputSource,
-} from "../bots.js";
+} from "../zcode-protocol-v4/bot-source.js";
 export {
   botTopicContextSchema,
   botTopicMessageSchema,
   type BotTopicHistoryBatch,
   type BotTopicMessage,
-} from "../bots.js";
+} from "../zcode-protocol-v4/bot-source.js";

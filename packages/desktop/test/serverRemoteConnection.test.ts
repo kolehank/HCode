@@ -336,17 +336,11 @@ describe("server remote connection", () => {
     const server = await startLoopbackServer(services, 0, { topicResourcePeers: peers });
     const address = server.address() as AddressInfo;
     const validate = vi.fn(async () => undefined);
-    const relay = createTopicResourceRelayChannel({
-      validate,
-      read: async () => {
-        throw new Error("Not requested");
-      },
-    });
     const connection = await connectServerRemote(
       { kind: "server", url: `http://127.0.0.1:${address.port}` },
-      { topicResourceChannel: relay.channel },
+      { topicResourceChannel: createTopicResourceRelayChannel({ validate }).channel },
     );
-    disposables.push(connection, relay);
+    disposables.push(connection);
     const request = {
       requestId: "r",
       taskId: "t",

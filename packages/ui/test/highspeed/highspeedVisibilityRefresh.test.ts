@@ -17,10 +17,6 @@ const captured = vi.hoisted(() => ({
 }));
 
 const mocks = vi.hoisted(() => ({
-  // SessionPane 会读取 Bot 绑定并订阅广播；此处保持普通任务，避免依赖缺失阻断到期断言。
-  botsService: {
-    getBotStates: vi.fn(async () => []),
-  },
   broadcastService: {
     onMessage: vi.fn(() => ({ dispose: vi.fn() })),
   },
@@ -104,7 +100,6 @@ vi.mock("@/v4/ConversationDraftSuggestedPromptsContainer.js", () => ({
 vi.mock("@/hooks/useServices.js", () => ({
   useComposerClientNamespace: () => "desktop",
   useServices: () => ({
-    botsService: mocks.botsService,
     broadcastService: mocks.broadcastService,
     highspeedCardService: mocks.highspeedCardService,
     modelProviderService: mocks.modelProviderService,

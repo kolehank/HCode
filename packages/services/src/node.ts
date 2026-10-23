@@ -22,7 +22,6 @@ import { getZCodeDataRootDir as projectDataRoot } from "#src/paths.js";
 import { createTaskGroupService, ITaskGroupService, groupTaskKey } from "#src/task-groups/index.js";
 import { IGenUiService } from "./gen-ui/contract.js";
 import { createGenUiService } from "./gen-ui/node.js";
-import { channelReplyHostRequestSchema, channelReplyResultSchema } from "@zcode/shared";
 /* eslint-disable max-lines -- host process 服务注册和启动装配需要集中维护，拆散后会更难追踪依赖注入顺序 */
 // Node.js service implementations — NOT safe to import in browser code
 import { randomBytes } from "node:crypto";
@@ -171,7 +170,6 @@ export type {
   CuaHelperInstallerOptions,
 } from "./cua-permission-broker/index.js";
 export { createProjectWorkspaceNavigation } from "#src/project-workspace-navigation/index.js";
-export { createBotsService } from "./bots/botsService.js";
 export { createFileWatcherService } from "./fileWatcher/fileWatcherService.js";
 // BYOK fork P1b：OAuth 体系已删除，相关导出移除。
 // BYOK fork P0：telemetryCore（数仓事件上报）与设备标识已删除，导出随之移除。
@@ -359,7 +357,6 @@ import { IZCodeTaskService } from "./session/zcodeTaskService.js";
 import { IZCodeAgentService } from "./zcode-agent/zcodeAgent.js";
 import type { CuaOperationStateReporter } from "./zcode-agent/cuaOperationTurnTracker.js";
 import { IZCodeSessionService } from "./zcode-session/zcodeSession.js";
-import { IBotsService } from "./bots/bots.js";
 import { IFileWatcherService } from "./fileWatcher/fileWatcher.js";
 import { ISourceServerWorkspaceService } from "./source-server-workspace/sourceServerWorkspace.js";
 // BYOK fork P1a：usage-stats / coding-plan-subscription / client-config / feedback 描述符随模块删除。
@@ -403,13 +400,6 @@ import { createZCodeTaskIndexSyncer } from "./zcode-agent/zcodeTaskIndexSyncer.j
 import { TaskIndexRepo } from "./session/taskIndexRepo.js";
 import { AutomationRepo } from "#src/session/automationRepo.js";
 import type { AppSettings } from "@zcode/shared";
-import { createBotsService } from "./bots/botsService.js";
-import { BotsRepo } from "#src/bots/repo.js";
-import {
-  createBotProjectRuntime,
-  type BotProjectConnection,
-} from "#src/bot-project-runtime/index.js";
-export type { BotProjectConnection } from "#src/bot-project-runtime/contract.js";
 import type { SessionMessageSendRequested } from "#src/session/sessionMailbox.js";
 import { createFileWatcherService } from "./fileWatcher/fileWatcherService.js";
 import { readLegacyZCodeConfigProviders } from "./model-provider/legacyZCodeConfigProviderReader.js";
@@ -1118,11 +1108,6 @@ export function createLocalServices(options: {
   /** 已鉴权 Desktop stdio 连接提供的私有回查频道；不作为公共 service 暴露。 */
   topicResourceRelayChannel?: (request: unknown) => IChannel;
   parentPort?: Parameters<typeof createBroadcastService>[0];
-  /** Desktop Window Host 提供当前 Source 身份和线路，其他宿主不推断 Desktop 状态。 */
-  resolveBotRemoteWorkspace?: (target: {
-    workspacePath: string;
-    workspaceIdentity: string;
-  }) => Promise<{ workspacePath: string; workspaceIdentity: string } | null>;
   /** Host 装配层注入的设置权威；与网络 transport 必须来自同一 Window Host 生命周期。 */
   settingService?: ISettingService;
   setWorkspaceProjection?: ReturnType<
@@ -1189,7 +1174,6 @@ export function createLocalServices(options: {
   sourceServerWorkspaceService?: ISourceServerWorkspaceService;
   resolveProjectHostService?: (hostId: string) => Promise<IProjectService>;
   /** Bot 复用窗口已有 Source 连接；不经 main 创建 workspace attachment。 */
-  resolveBotProjectConnection?: (hostId: string) => BotProjectConnection | undefined;
   remoteProjectConnection?: Pick<
     Parameters<typeof createRemoteProjectService>[0],
     "connectHost" | "readConnectionStates"
@@ -2105,21 +2089,6 @@ export function createLocalServices(options: {
     spawnFallbackCwd: options?.zcodeAgentSpawnFallbackCwd,
     // browser-use：host→main 执行桥透传给 agent service 的 onRequest browserExecute 路由。
     browserControlExecutor: options?.browserControlExecutor,
-    // 机器人凭据只归属于授权 Host；远端独立服务不能借用本机配置扩大读取范围。
-    channelReplyExecutor: async (value) => {
-      const request = channelReplyHostRequestSchema.parse(value);
-      if (
-        options?.topicResourceRelayChannel &&
-        (isDesktopAttachedRemote || request.remoteSessionId)
-      )
-        return channelReplyResultSchema.parse(
-          await options.topicResourceRelayChannel(request).call("reply", request),
-        );
-      if (isDesktopAttachedRemote) throw new Error("Desktop channel reply peer unavailable");
-      const bots = services.getOptional(IBotsService);
-      if (!bots?.replyToChannel) throw new Error("Bot channel reply unavailable");
-      return bots.replyToChannel(request);
-    },
     topicResourceExecutor: async (request, signal) => {
       if (
         options?.topicResourceRelayChannel &&
@@ -2131,9 +2100,8 @@ export function createLocalServices(options: {
           signal,
         );
       if (isDesktopAttachedRemote) throw new Error("Desktop topic resource peer unavailable");
-      const bots = services.getOptional(IBotsService);
-      if (!bots?.readTopicResource) throw new Error("Topic resource service is unavailable");
-      return bots.readTopicResource({ ...request, signal });
+      // BYOK fork P1c：Bot 渠道已删除，topic resource 恒不可用。
+      throw new Error("Topic resource service is unavailable");
     },
     topicResourceValidator: async (request, signal) => {
       if (
@@ -2146,10 +2114,8 @@ export function createLocalServices(options: {
           signal,
         );
       if (isDesktopAttachedRemote) throw new Error("Desktop topic resource peer unavailable");
-      const bots = services.getOptional(IBotsService);
-      if (!bots?.validateTopicResource)
-        throw new Error("Topic resource authorization is unavailable");
-      return bots.validateTopicResource({ ...request, signal });
+      // BYOK fork P1c：Bot 渠道已删除，topic resource 授权恒不可用。
+      throw new Error("Topic resource authorization is unavailable");
     },
     // BYOK fork P1a：官方 Server MCP 身份头 resolver 与可信 Origin registry 不再注入；
     // agent 侧 interaction/requestOfficialMcpAuthHeaders 按缺省 fail-closed 拒绝。
@@ -2337,39 +2303,7 @@ export function createLocalServices(options: {
     settingService,
     cuaProductMcpServerResolver,
   });
-  const botsRepo = new BotsRepo();
-  const botLog = createServiceLogger("bots");
-  const botRemoteWorkspaceService = options.resolveBotProjectConnection
-    ? createBotProjectRuntime({
-        remoteProjectService,
-        resolveOnline: options.resolveBotProjectConnection,
-        onConnectionsChanged: (listener) =>
-          broadcastService.onMessage((event) => {
-            if (event.channel === "state:projects") listener();
-          }),
-        readBoundTargets: async () =>
-          Object.values((await botsRepo.readState()).bots).flatMap((context) =>
-            context.workspaceIdentity
-              ? [
-                  {
-                    workspacePath: context.workspacePath,
-                    workspaceIdentity: context.workspaceIdentity,
-                    hostId: context.hostId,
-                  },
-                ]
-              : [],
-          ),
-        readRuntimePreferences: async () => {
-          const settings = await settingService.get();
-          return {
-            askUserQuestionAutoResolutionEnabled:
-              settings.askUserQuestionAutoResolutionEnabled !== false,
-            modelIoFullRetentionEnabled: settings.modelIoFullRetentionEnabled === true,
-          };
-        },
-        warn: (message) => botLog.warn(message),
-      })
-    : undefined;
+  // BYOK fork P1c：Bot 渠道运行时（BotsRepo / bot-project-runtime）已删除。
   // BYOK fork P1b：OAuth service 已删除；zcode JWT 401 不再触发条件登出，仅记录。
   const zcodeJwtLogoutLogger = createServiceLogger("zcode-jwt-logout");
   zcodeJwtLogoutHandlerRef.current = (input, _headers) => {
@@ -2463,26 +2397,7 @@ export function createLocalServices(options: {
     .register(IRemoteProjectService, remoteProjectService)
     .register(ICuaPermissionService, cuaPermissionService)
     .register(ICuaPipSessionService, cuaPipSessionService)
-    .register(
-      IBotsService,
-      createBotsService({
-        repo: botsRepo,
-        projectService,
-        remoteProjectService,
-        ownerHostId: options?.projectStorageHostId ?? "local",
-        credentialService,
-        zcodeTaskService,
-        broadcastService,
-        settingService,
-        modelSelectionService: providerRuntime.modelSelection,
-        remoteWorkspaceService: botRemoteWorkspaceService
-          ? { ...botRemoteWorkspaceService, resolveWorkspace: options?.resolveBotRemoteWorkspace }
-          : undefined,
-        // 远端与本地 Bot 都读取所属 Environment 的 Model Selection View。
-        // 远端启动期不再轮询旧 Preset，避免重新制造一套模型候选事实。
-        runStartupBackgroundTasks: !isDesktopAttachedRemote,
-      }),
-    )
+    // BYOK fork P1c：IBotsService（Bot 渠道）注册随模块删除。
     .register(IFileWatcherService, createFileWatcherService())
     .register(ISourceServerWorkspaceService, sourceServerWorkspaceService)
     // BYOK fork P1a：usage-stats / coding-plan-subscription / client-config 注册随模块删除。
@@ -2781,7 +2696,6 @@ export function disposeServiceResources(services: ServiceCollection): void {
     services.getOptional(IZCodeTaskService),
     services.getOptional(IZCodeAgentService),
     services.getOptional(IZCodeSessionService),
-    services.getOptional(IBotsService),
     services.getOptional(IFileWatcherService),
     services.getOptional(ISubagentsService),
     services.getOptional(IOffPeakTaskService),
@@ -2822,7 +2736,6 @@ export async function disposeServiceResourcesAndWait(services: ServiceCollection
     services.getOptional(IZCodeTaskService),
     services.getOptional(IZCodeAgentService),
     services.getOptional(IZCodeSessionService),
-    services.getOptional(IBotsService),
     services.getOptional(IFileWatcherService),
     services.getOptional(ISubagentsService),
     services.getOptional(IOffPeakTaskService),

@@ -9,7 +9,6 @@ import {
   PlatformChannels,
   type RemoteTarget,
 } from "@zcode/shared";
-import { resolveBotRemoteWorkspace } from "../src/host/botRemoteWorkspaceResolver.js";
 import { createRemoteWorkspaceSessionManager } from "../src/main/desktopRemoteSessions.js";
 
 const { browserWindowMock, channels } = vi.hoisted(() => {

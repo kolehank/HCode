@@ -19,7 +19,6 @@ import { isOffPeakTerminalStatus } from "@zcode/shared";
 import { createHostNetworkCapture } from "./hostNetworkCapture.js";
 import { randomUUID } from "node:crypto";
 import { createPluginSandboxRegistrationBridge } from "./pluginSandbox/index.js";
-import { createWindowTopicResourceRelay } from "./windowTopicResourceRelay.js";
 import {
   MessagePortProtocol,
   ChannelServer,
@@ -28,15 +27,13 @@ import {
   LoggingChannelServer,
   NetworkTelemetryChannelServer,
 } from "@zcode/rpc";
-import { registerHostNetworkTelemetry, stopHostNetworkTelemetry } from "./hostNetworkTelemetry.js";
-import { registerHostServiceResourceTelemetry } from "./hostServiceResourceTelemetry.js";
+import { registerHostNetworkTelemetry, stopHostNetworkTelemetry } from "./hostNetworkTelemetry.js";import { registerHostServiceResourceTelemetry } from "./hostServiceResourceTelemetry.js";
 import { resolveResourceTelemetryEnvironmentKey } from "./hostResourceTelemetryEnvironment.js";
 import { reportHostSessionCreate } from "./hostSessionCreateTelemetry.js";
 import { createBrowserControlMainBridge } from "./browserControlMainBridge.js";
 import { materializeBrowserRecordingArtifact } from "./browserRecordingArtifactMaterializer.js";
 import {
   ServiceCollection,
-  IBotsService,
   ICredentialService,
   IFileService,
   IMediaPreviewService,
@@ -79,7 +76,6 @@ import {
   createSettingServiceWithMigrations,
   OffPeakModelUnavailableError,
   OffPeakPermanentDispatchError,
-  type BotProjectConnection,
   type HostApiNetworkTransport,
   type OffPeakRequestAuthBuilder,
 } from "@zcode/services/node";
@@ -135,7 +131,6 @@ import {
   createRemoteMediaPreviewProxy,
   type RemoteMediaPreviewProxy,
 } from "./remoteMediaPreviewProxy.js";
-import { watchCronRunBotDelivery } from "./cronBotDelivery.js";
 import { createHostRemoteWorkspaceProxyState } from "./hostRemoteWorkspaceProxyState.js";
 import {
   createServerRemoteWorkspaceServiceCollection,
@@ -158,7 +153,6 @@ import {
   settleManualDispatchFailureBestEffort,
 } from "./cronRunLifecycle.js";
 import { connectServerRemote, type ServerRemoteConnection } from "./serverRemoteConnection.js";
-import { bindBotGroupTaskScope } from "./botGroupTaskScope.js";
 import { createWindowHostAttachmentRegistry } from "./windowHostAttachmentRegistry.js";
 import { exposeWindowHostAttachmentServices } from "./windowHostAttachmentRpcPolicy.js";
 // BYOK fork P1a：conversationShareAttachmentService 随会话分享删除。
@@ -171,7 +165,6 @@ import { pushDynamicWorkflowUserModeToRemoteHosts } from "./remoteDynamicWorkflo
 import { connectDesktopSourceServer } from "./connectDesktopSourceServer.js";
 import { prepareRemoteWorkspaceIdentity } from "./remoteWorkspacePreparation.js";
 import { createWindowHostControllerRuntime } from "./windowHostControllerService.js";
-import { resolveBotRemoteWorkspace } from "./botRemoteWorkspaceResolver.js";
 import { SourceServerDirectory } from "./sourceServerDirectory.js";
 import { connectSourceServerTarget } from "./connectSourceServerTarget.js";
 import {
@@ -1063,27 +1056,6 @@ async function dispatchCronRun(request: CronRunDispatchRequest): Promise<{
         mode: request.mode,
       });
     }
-    const botsService = targetServices.getOptional(IBotsService);
-    if (botsService) {
-      try {
-        await watchCronRunBotDelivery({
-          automationId: request.automationId,
-          runId: promptTraceId,
-          workspaceKey,
-          workspacePath: request.workspacePath,
-          ...(request.workspaceIdentity ? { workspaceIdentity: request.workspaceIdentity } : {}),
-          taskId: task.taskId,
-          repo: cronAutomationRepo,
-          botsService,
-        });
-      } catch (error) {
-        // Bot 回推是 best-effort 辅助通道；配置/凭据/订阅失败不能阻断 automation 派发与结算。
-        logger.warn(
-          `automation Bot delivery subscription failed automation=${request.automationId} provider=unknown`,
-          error,
-        );
-      }
-    }
     trackedKey = cronRunSubscriptionKey(task.taskId, promptTraceId);
     trackCronRunOutcome({
       zcodeTaskService,
@@ -1760,49 +1732,6 @@ function notifyProjectChange(): void {
     .catch((error) => logger.warn("failed to notify project change", error));
 }
 
-/** Bot 只取得当前 Source 代际，不拥有连接，也不创建 logical tab。 */
-function resolveBotProjectConnection(hostId: string): BotProjectConnection | undefined {
-  const serverId = parseRemoteWorkspaceIdentity(
-    buildRemoteHostWorkspaceIdentity(hostId, "/"),
-  )?.sourceServerId;
-  if (!serverId) return undefined;
-  const registered = windowRemoteConnectionRegistry.getOnlineSource(serverId);
-  if (registered) {
-    const services = registered.services;
-    return {
-      owner: registered.capabilities?.physicalOwner?.() ?? services,
-      taskService: createControllerRoutedTaskService(services.get(IZCodeTaskService), {
-        kind: "local",
-      }),
-      modelSelectionService: services.get(IModelSelectionService),
-      agentService: services.get(IZCodeAgentService),
-      bindWorkspace: async (target) => {
-        await registered.capabilities?.bindWorkspaceIdentity?.({
-          workspacePath: target.workspacePath,
-          stableWorkspaceIdentity: target.workspaceIdentity,
-          legacyRouteHint: target.workspaceIdentity,
-        });
-      },
-    };
-  }
-  const connection = sourceServerConnectionManager?.getOnlineConnection(serverId);
-  if (!connection) return undefined;
-  return {
-    owner: connection.services,
-    taskService: createControllerRoutedTaskService(connection.services.zcodeTaskService, {
-      kind: "local",
-    }),
-    modelSelectionService: connection.services.modelSelectionService,
-    agentService: connection.services.zcodeAgentService,
-    bindWorkspace: async (target) => {
-      await connection.services.sourceServerWorkspaceService.resolveWorkspace({
-        workspacePath: target.workspacePath,
-        legacyRouteHint: target.workspaceIdentity,
-      });
-    },
-  };
-}
-
 function requireActiveHostApiNetworkTransport(): HostApiNetworkTransport {
   if (!activeHostApiNetworkTransport) {
     // Bug 原因：Source Server release 下载若在 Host 网络策略之外回退 global fetch，会绕过设置页代理。
@@ -1831,7 +1760,6 @@ async function ensureSourceServerConnectionManager(): Promise<SourceServerConnec
       connectServer: (options) =>
         connectDesktopSourceServer(options, {
           resolveServices: (scope) => windowRemoteConnectionRegistry.resolveScopedServices(scope),
-          getBots: () => activeServices?.getOptional(IBotsService),
           readDynamicWorkflowMode: async () =>
             (await activeServices?.get(ISettingService).get())?.dynamicWorkflowMode,
           onModeSyncError: (error) =>
@@ -1874,9 +1802,7 @@ async function createWindowRemoteConnectionHandle(params: {
   }
   const closeListeners = new Set<(event: WindowRemoteConnectionCloseEvent) => void>();
   const reconnectListeners = new Set<() => void>();
-  let topicResourceRelay: ReturnType<typeof createWindowTopicResourceRelay> | undefined;
   const notifyClose = (event: WindowRemoteConnectionCloseEvent) => {
-    topicResourceRelay?.dispose();
     for (const listener of closeListeners) {
       listener(event);
     }
@@ -1926,27 +1852,16 @@ async function createWindowRemoteConnectionHandle(params: {
       intent: params.membershipIntent ?? "add",
     });
     params.signal.throwIfAborted();
-    topicResourceRelay = createWindowTopicResourceRelay({
-      getPeerAgentService: () => connection?.services.zcodeAgentService,
-      resolveServices: (scope) => windowRemoteConnectionRegistry.resolveScopedServices(scope),
-      getBots: () => activeServices?.getOptional(IBotsService),
+    connection = await connectServerRemote(admission.target, {
+      signal: params.signal,
+      fetchImpl: requireActiveHostApiNetworkTransport().fetch,
+      commitMembership: admission.commit,
+      onClose: ({ code, reason }) => {
+        sourceClosed = true;
+        detachOwnSourceSettings();
+        notifyClose({ exitCode: code, signal: null, ...(reason ? { error: reason } : {}) });
+      },
     });
-    try {
-      connection = await connectServerRemote(admission.target, {
-        signal: params.signal,
-        fetchImpl: requireActiveHostApiNetworkTransport().fetch,
-        commitMembership: admission.commit,
-        topicResourceChannel: topicResourceRelay.channel,
-        onClose: ({ code, reason }) => {
-          sourceClosed = true;
-          detachOwnSourceSettings();
-          notifyClose({ exitCode: code, signal: null, ...(reason ? { error: reason } : {}) });
-        },
-      });
-    } catch (error) {
-      topicResourceRelay.dispose();
-      throw error;
-    }
   } else {
     if (!sourceServerDirectory) {
       throw new Error("Source Server manager 尚未初始化");
@@ -2059,7 +1974,6 @@ async function createWindowRemoteConnectionHandle(params: {
   }
 
   if (params.signal.aborted) {
-    topicResourceRelay?.dispose();
     await disposeHostRemoteConnection(connection);
     throw new Error("远程连接已取消");
   }
@@ -2175,7 +2089,6 @@ async function createWindowRemoteConnectionHandle(params: {
       }
       disposed = true;
       detachOwnSourceSettings();
-      topicResourceRelay?.dispose();
       closeListeners.clear();
       reconnectListeners.clear();
       managerStateSubscription?.dispose();
@@ -2543,18 +2456,6 @@ function createControllerRoutedTaskService(
         };
       }
       const value = Reflect.get(target, property, receiver) as unknown;
-      if (
-        typeof value === "function" &&
-        [
-          "getBotGroupTaskBlockReason",
-          "cancelBotGroupInput",
-          "submitBotGroupInput",
-          "readBotTopicSummaries",
-        ].includes(String(property))
-      ) {
-        return (params: Record<string, unknown>) =>
-          value.call(target, bindBotGroupTaskScope(params, attachmentScope));
-      }
       return typeof value === "function" ? value.bind(target) : value;
     },
   });
@@ -2974,7 +2875,16 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
       const navigation = createProjectWorkspaceNavigation({
         projectService: services.get(IProjectService),
         remoteProjectService: services.get(IRemoteProjectService),
-        readConnectionOwner: (hostId) => resolveBotProjectConnection(hostId)?.owner,
+        // 只复用窗口 Registry 里的在线物理连接；连接代际由 owner 身份比对判定。
+        readConnectionOwner: (hostId) => {
+          const serverId = parseRemoteWorkspaceIdentity(
+            buildRemoteHostWorkspaceIdentity(hostId, "/"),
+          )?.sourceServerId;
+          const registered = serverId
+            ? windowRemoteConnectionRegistry.getOnlineSource(serverId)
+            : undefined;
+          return registered?.capabilities?.physicalOwner?.() ?? registered?.services;
+        },
         openRemoteWorkspace: async ({ host, directories, owner, assertCurrent }) => {
           assertHost();
           const serverId = parseRemoteWorkspaceIdentity(
@@ -3743,14 +3653,6 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
                   },
                 });
               },
-              resolveBotProjectConnection,
-              resolveBotRemoteWorkspace: (workspace) =>
-                sourceServerDirectory
-                  ? resolveBotRemoteWorkspace(workspace, "lookup", {
-                      directory: sourceServerDirectory,
-                      listSessions: () => windowRemoteConnectionRegistry.listSessions(),
-                    })
-                  : Promise.resolve(null),
               setWorkspaceProjection,
               remoteProjectConnection: {
                 connectHost: async (host) => {

@@ -1,4 +1,3 @@
-import { channelReplyHostRequestSchema } from "@zcode/shared";
 import type { IServerChannel, CancellationToken } from "@zcode/rpc";
 import {
   zcodeTopicResourceRelayRequestSchema,
@@ -23,10 +22,6 @@ export function createTopicResourceRelayChannel(deps: TopicResourceRelayDependen
     ): Promise<T> {
       if (disposed || token?.isCancellationRequested)
         throw new Error("Topic resource connection closed");
-      if (command === "reply") {
-        if (!deps.reply) throw new Error("Channel reply unavailable");
-        return (await deps.reply(channelReplyHostRequestSchema.parse(value))) as T;
-      }
       if (command === "validate") {
         const request = zcodeTopicResourceRelayRequestSchema.parse(value);
         if (validations.size >= 2) throw new Error("Topic resource validation busy");

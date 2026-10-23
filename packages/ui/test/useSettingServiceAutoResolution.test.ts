@@ -20,22 +20,12 @@ const zcodeAgentService = {
       }) => Promise<void>
     >(),
 };
-const botsService = {
-  syncAppRuntimePreferences:
-    vi.fn<
-      (preferences: {
-        askUserQuestionAutoResolutionEnabled: boolean;
-        modelIoFullRetentionEnabled: boolean;
-      }) => Promise<void>
-    >(),
-};
 
 vi.mock("@/hooks/useServices.js", () => ({
   useServices: () => ({
     broadcastService,
     settingService,
     zcodeAgentService,
-    botsService,
   }),
 }));
 
@@ -53,7 +43,6 @@ describe("useSettings AskUserQuestion runtime preference", () => {
     settingService.update.mockResolvedValue(undefined);
     broadcastService.send.mockResolvedValue(undefined);
     zcodeAgentService.syncAppRuntimePreferences.mockResolvedValue(undefined);
-    botsService.syncAppRuntimePreferences.mockResolvedValue(undefined);
   });
 
   it("账号 CAS 条件透传到设置 owner，冲突拒绝更新", async () => {
@@ -82,10 +71,10 @@ describe("useSettings AskUserQuestion runtime preference", () => {
     const { useSettings } = await import("@/hooks/useSettingService.js");
     const hook = renderHook(() => useSettings());
     await waitFor(() => expect(hook.result.current.loading).toBe(false));
-    let releaseBotSync: (() => void) | undefined;
-    botsService.syncAppRuntimePreferences.mockReturnValueOnce(
+    let releaseAgentSync: (() => void) | undefined;
+    zcodeAgentService.syncAppRuntimePreferences.mockReturnValueOnce(
       new Promise<void>((resolve) => {
-        releaseBotSync = resolve;
+        releaseAgentSync = resolve;
       }),
     );
 
@@ -95,9 +84,9 @@ describe("useSettings AskUserQuestion runtime preference", () => {
         askUserQuestionAutoResolutionEnabled: false,
       });
     });
-    await waitFor(() => expect(botsService.syncAppRuntimePreferences).toHaveBeenCalledOnce());
+    await waitFor(() => expect(zcodeAgentService.syncAppRuntimePreferences).toHaveBeenCalledOnce());
     expect(broadcastService.send).not.toHaveBeenCalled();
-    releaseBotSync?.();
+    releaseAgentSync?.();
     await act(async () => {
       await updatePromise;
     });
@@ -109,10 +98,6 @@ describe("useSettings AskUserQuestion runtime preference", () => {
       askUserQuestionAutoResolutionEnabled: false,
       modelIoFullRetentionEnabled: false,
     });
-    expect(botsService.syncAppRuntimePreferences).toHaveBeenCalledWith({
-      askUserQuestionAutoResolutionEnabled: false,
-      modelIoFullRetentionEnabled: false,
-    });
     expect(broadcastService.send).toHaveBeenCalledWith({
       channel: APP_RUNTIME_PREFERENCES_CHANGED_BROADCAST_CHANNEL,
       payload: {
@@ -121,9 +106,6 @@ describe("useSettings AskUserQuestion runtime preference", () => {
       },
     });
     expect(zcodeAgentService.syncAppRuntimePreferences.mock.invocationCallOrder[0]).toBeLessThan(
-      broadcastService.send.mock.invocationCallOrder[0] ?? 0,
-    );
-    expect(botsService.syncAppRuntimePreferences.mock.invocationCallOrder[0]).toBeLessThan(
       broadcastService.send.mock.invocationCallOrder[0] ?? 0,
     );
 
@@ -147,7 +129,6 @@ describe("useSettings AskUserQuestion runtime preference", () => {
       modelIoFullRetentionEnabled: true,
     };
     expect(zcodeAgentService.syncAppRuntimePreferences).toHaveBeenCalledWith(preferences);
-    expect(botsService.syncAppRuntimePreferences).toHaveBeenCalledWith(preferences);
     expect(broadcastService.send).toHaveBeenCalledWith({
       channel: APP_RUNTIME_PREFERENCES_CHANGED_BROADCAST_CHANNEL,
       payload: preferences,
@@ -181,7 +162,6 @@ describe("useSettings AskUserQuestion runtime preference", () => {
           update: vi.fn(async () => undefined),
         },
         zcodeAgentService,
-        botsService,
       }) as unknown as IServiceAccessor;
     const controllerServices = createServices("zh-CN");
     const sourceServices = createServices("en-US");
@@ -214,7 +194,6 @@ describe("useSettings AskUserQuestion runtime preference", () => {
       broadcastService,
       settingService: controllerSettingService,
       zcodeAgentService,
-      botsService,
     } as unknown as IServiceAccessor;
     const { useSettings } = await import("@/hooks/useSettingService.js");
     const hook = renderHook(() =>
@@ -267,7 +246,6 @@ describe("useSettings AskUserQuestion runtime preference", () => {
 
     expect(settingService.update).toHaveBeenCalledWith({ toolSearchMode: "local" });
     expect(zcodeAgentService.syncAppRuntimePreferences).not.toHaveBeenCalled();
-    expect(botsService.syncAppRuntimePreferences).not.toHaveBeenCalled();
     expect(broadcastService.send).not.toHaveBeenCalled();
     hook.unmount();
   });

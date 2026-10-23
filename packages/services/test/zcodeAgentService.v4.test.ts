@@ -1,7 +1,6 @@
 import { seedTaskIndex } from "./helpers/taskIndexFixture.js";
 import { fixture, port } from "#src/project-storage/test-fixture.js";
 import type { ZCodeSessionInfo } from "@zcode/shared";
-import { channelReplyHostRequestSchema, type ChannelReplyHostRequest } from "@zcode/shared";
 // v4 conversation 通道 host 转发面测试（M3 竖切，docs/v4-refactor/01-topology §host 通道层）。
 // 验证 host 只做透传：subscribe/unsubscribe/command 转发给 CLI v4 方法，
 // v4/conversation/frame 通知按 workspace fan-out 给 onDynamicConversationFrame 订阅者。
@@ -63,9 +62,6 @@ process.stdin.on("data", (chunk) => {
       send({ id: msg.id, result: { accepted: true } });
       send({ method: "v4/offPeak/lifecycle", params: { sessionId: msg.params.sessionId, executionId: msg.params.executionId, offPeakTaskId: "idle-task", type: "ticket_released", ticketId: "old" } });
       continue;
-    }
-    if (msg.method === "v4/conversation/subscribe" && msg.params.topic.endsWith("/channel-reply-source")) {
-      send({ id: "reverse-reply", method: "bot/channel/reply", trace: { traceId: "trace-native" }, params: { taskId: "channel-reply-source", inputId: "input-a", toolCallId: "call-a", parts: [{type:"mention",refId:"m1"}] } });
     }
     if (msg.method === "v4/conversation/subscribe" && msg.params.topic.endsWith("/topic-resource-source")) {
       send({ id: "reverse-resource", method: "topic/resource/read", params: { requestId: "resource-a", taskId: "topic-resource-source", inputId: "input-a", authorizationId: "auth-a", messageId: "message-a", resourceIndex: 0 } });
@@ -421,9 +417,6 @@ describe("zcodeAgentService v4 conversation channel", () => {
         Parameters<typeof createZCodeAgentService>[0]
       >["resolveSessionDirectories"];
       storedSessions?: (workspacePath: string) => ZCodeSessionInfo[];
-      channelReplyExecutor?: NonNullable<
-        Parameters<typeof createZCodeAgentService>[0]
-      >["channelReplyExecutor"];
       topicResourceExecutor?: NonNullable<
         Parameters<typeof createZCodeAgentService>[0]
       >["topicResourceExecutor"];
@@ -448,7 +441,6 @@ describe("zcodeAgentService v4 conversation channel", () => {
       repoSnapshotCaptureIntentScheduler: options.repoSnapshotCaptureIntentScheduler,
       repoSnapshotSidecar: options.repoSnapshotSidecar,
       topicResourceExecutor: options.topicResourceExecutor,
-      channelReplyExecutor: options.channelReplyExecutor,
       authorizeLocalMediaPreviewPath: options.authorizeLocalMediaPreviewPath,
       modelSelectionReadinessSource: {
         async getView() {
@@ -708,46 +700,6 @@ describe("zcodeAgentService v4 conversation channel", () => {
         ).not.toContain("different-project");
       } finally {
         await env.service.disposeAllAndWait();
-      }
-    },
-  );
-
-  it.each([false, true])(
-    "projects only channel reply scope from a live V4 connection (remote=%s)",
-    async (remote) => {
-      const reply = vi.fn(async (value: ChannelReplyHostRequest) => {
-        // 与实际 Host executor 一样执行严格校验，不能用宽松 spy 掩盖额外连接字段。
-        channelReplyHostRequestSchema.parse(value);
-        return { status: "sent" as const, deliveryId: "delivery", providerMessageId: "om_sent" };
-      });
-      const { service, workspacePath } = setupService({ channelReplyExecutor: reply });
-      const scope = remote
-        ? { workspaceIdentity: "ssh://host/work", remoteSessionId: "logical-session" }
-        : {};
-      const target = {
-        workspacePath,
-        ...scope,
-        sessionId: "channel-reply-source",
-        envelope: { requestId: "transport-request" },
-        __zcodeTrustedV4Connection: { connectionId: "test-connection" },
-      };
-      try {
-        await service.subscribeConversationV4(target);
-        await vi.waitFor(() => expect(reply).toHaveBeenCalled());
-        const received = reply.mock.calls[0]![0];
-        expect(() => channelReplyHostRequestSchema.parse(received)).not.toThrow();
-        expect(received).toEqual({
-          workspacePath,
-          workspaceIdentity: scope.workspaceIdentity,
-          remoteSessionId: scope.remoteSessionId,
-          taskId: "channel-reply-source",
-          inputId: "input-a",
-          toolCallId: "call-a",
-          trace: { traceId: "trace-native" },
-          parts: [{ type: "mention", refId: "m1" }],
-        });
-      } finally {
-        await service.disposeAllAndWait();
       }
     },
   );

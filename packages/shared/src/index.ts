@@ -296,7 +296,7 @@ export * from "./process-names.js";
 export * from "./mcp.js";
 export * from "./runtime-tool-runtime.js";
 export * from "./git.js";
-export * from "./bots.js";
+export * from "./zcode-protocol-v4/bot-source.js";
 export * from "./assistant-message-parts.js";
 export * from "./zcodePersistedMessageMerge.js";
 export * from "./assistant-presentation.js";
@@ -364,8 +364,6 @@ export {
 
 export * from "./conversationSelection.js";
 export * from "./attachment-source.js";
-
-export * from "./channel-mention.js";
 
 export {
   requestSecuritySensitiveHeaders,

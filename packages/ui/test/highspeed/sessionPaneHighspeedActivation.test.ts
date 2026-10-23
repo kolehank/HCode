@@ -74,10 +74,6 @@ const servicesMock = vi.hoisted(() => ({
       additionalDirectories: [],
     })),
   },
-  // 普通任务也会读取 Bot 绑定并订阅广播，补齐依赖以保持激活动效测试的原有范围。
-  botsService: {
-    getBotStates: vi.fn(async () => []),
-  },
   broadcastService: {
     onMessage: vi.fn(() => ({ dispose: vi.fn() })),
   },

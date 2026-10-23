@@ -796,12 +796,6 @@ export function App({
   const testActions = useMemo<TestActions>(
     () => ({
       ...taskListE2EActions,
-      sendBotMessage: (message) => services.botsService.handleInboundMessage(message),
-      submitBotGroupInput: (params) => {
-        const submit = services.zcodeTaskService.submitBotGroupInput;
-        if (!submit) throw new Error("Task material admission unavailable");
-        return submit.call(services.zcodeTaskService, params);
-      },
       getTheme: () => theme,
       setTheme,
       getLocale: () => locale,
@@ -821,8 +815,6 @@ export function App({
     }),
     [
       locale,
-      services.botsService,
-      services.zcodeTaskService,
       services.zcodeAgentService,
       setLocale,
       theme,

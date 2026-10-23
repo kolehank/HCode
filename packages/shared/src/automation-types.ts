@@ -1,5 +1,5 @@
 import type { ZCodeTaskMode } from "./zcode-task-types-core.js";
-import type { ZCodeAutomationBotDeliveryTarget } from "./bots.js";
+import type { ZCodeAutomationBotDeliveryTarget } from "./zcode-protocol-v4/bot-source.js";
 import type { ModelSelection } from "./model-selection.js";
 
 // ---- 定时任务(Automation)领域类型 ----

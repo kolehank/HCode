@@ -1253,7 +1253,6 @@ async function drainPendingInputUnlocked(
         withConversationQuotes(
           pendingInput.input,
           pendingInput.intent?.conversationQuotes,
-          pendingInput.intent?.botGroupSource,
         ),
         resolvedAttachments,
       ),

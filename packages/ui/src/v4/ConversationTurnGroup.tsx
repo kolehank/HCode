@@ -1,6 +1,3 @@
-import { BotTopicPreparation } from "@/v4/BotTopicPreparation.js";
-import { useBotTopicInterruption } from "@/v4/botGroupDeliveryContext.js";
-import { ConnectedBotGroupDeliveryAction } from "@/v4/BotGroupDeliveryAction.js";
 /* eslint-disable max-lines -- turn group 需要在同一处维护普通 assistant 与后台结果的严格行序，拆分会重复 actions/preview/tail 协议。 */
 import { useIsOfficeMode } from "@/hooks/useInterfaceMode.js";
 import {
@@ -636,16 +633,13 @@ function AssistantHistoryStatus({
   open,
   highspeed,
   highspeedMeta,
-  sourceCommandIds,
 }: {
   segment: ConversationTurnWorkSegment;
   open: boolean;
   highspeed: boolean;
   highspeedMeta?: HighspeedMessageMeta;
-  sourceCommandIds: readonly string[];
 }) {
   const { intl, locale } = useZCodeIntl();
-  const topicInterrupted = useBotTopicInterruption(sourceCommandIds);
   const durationLabel = formatConversationWorkDuration(
     segment.workStatus?.durationMs,
     intl,
@@ -659,9 +653,7 @@ function AssistantHistoryStatus({
       : null;
   const label =
     segment.workStatus?.state === "interrupted"
-      ? intl.formatMessage({
-          id: topicInterrupted ? "chat.history.topicInterrupted" : "chat.history.stopped",
-        })
+      ? intl.formatMessage({ id: "chat.history.stopped" })
       : segment.workStatus?.state === "running"
         ? intl.formatMessage({ id: "chat.history.workingFor" }, { duration: durationLabel ?? "" })
         : durationLabel
@@ -723,7 +715,6 @@ function AssistantHistoryStatus({
 
 function ConversationWorkSegmentFlow({
   segment,
-  sourceCommandIds,
   context,
   onFork,
   onRetry,
@@ -740,7 +731,6 @@ function ConversationWorkSegmentFlow({
   highspeedMeta,
 }: {
   segment: ConversationTurnWorkSegment;
-  sourceCommandIds: readonly string[];
   context: ConversationRowRenderContext;
   onFork?: (target: ConversationRowTarget) => void;
   onRetry?: (target: ConversationRowTarget) => void;
@@ -866,7 +856,6 @@ function ConversationWorkSegmentFlow({
                 open={open}
                 highspeed={highspeed}
                 highspeedMeta={highspeedMeta}
-                sourceCommandIds={sourceCommandIds}
               />
             ) : null}
             {content}
@@ -876,7 +865,6 @@ function ConversationWorkSegmentFlow({
       {shouldShowHistoryStatus && firstAssistantFlowItemIndex < 0 ? (
         <AssistantHistoryStatus
           segment={segment}
-          sourceCommandIds={sourceCommandIds}
           open={open}
           highspeed={highspeed}
           highspeedMeta={highspeedMeta}
@@ -996,16 +984,6 @@ function ConversationTurnFlow({
         <ConversationWorkSegmentFlow
           key={segment.key}
           segment={segment}
-          sourceCommandIds={[
-            ...segment.flowItems.flatMap((item) =>
-              item.kind === "userInput" && item.row.sourceCommandId
-                ? [item.row.sourceCommandId]
-                : [],
-            ),
-            ...(segment === workSegments[0] && unit.header?.sourceCommandId
-              ? [unit.header.sourceCommandId]
-              : []),
-          ]}
           context={context}
           onFork={onFork}
           onRetry={onRetry}
@@ -1409,11 +1387,6 @@ function ConversationTurnGroupImpl({
     !unit.timelineOnly &&
     latestAssistantTextRow?.state === "complete" &&
     assistantCopyText !== undefined;
-  // runtime turnId 与产品轮次 ID 不同；用 CLI 行上的命令归因关联投递，包含被裁剪输入的 header。
-  const deliverySourceCommandIds = [
-    ...(unit.header?.sourceCommandId ? [unit.header.sourceCommandId] : []),
-    ...unit.visibleUserInputs.flatMap((row) => (row.sourceCommandId ? [row.sourceCommandId] : [])),
-  ];
   const hasHookActions =
     // Hook action 与 copy/feedback/fork 共用 turn eligibility；
     // timelineOnly 维护 turn（compact/modelChange marker 轮）即使带历史遗留的
@@ -1584,12 +1557,11 @@ function ConversationTurnGroupImpl({
               onFeedbackChange={onFeedbackChange}
               hookInvocations={unit.hookInvocations}
               turnId={unit.turnId}
-              sourceCommandIds={deliverySourceCommandIds}
               className={cn(
                 "flex items-center gap-1",
                 context.compactForRemoteControl
                   ? "opacity-100"
-                  : "opacity-0 transition-opacity group-hover/assistant-turn:opacity-100 focus-within:opacity-100 has-[[data-bot-group-delivery]]:opacity-100",
+                  : "opacity-0 transition-opacity group-hover/assistant-turn:opacity-100 focus-within:opacity-100",
               )}
             />
           ) : (hasHookActions || !unit.isRunning) && !canRenderAssistantActions ? (
@@ -1599,16 +1571,12 @@ function ConversationTurnGroupImpl({
               className={cn(
                 context.compactForRemoteControl
                   ? "opacity-100"
-                  : "opacity-0 transition-opacity group-hover/assistant-turn:opacity-100 focus-within:opacity-100 has-[[data-bot-group-delivery]]:opacity-100",
+                  : "opacity-0 transition-opacity group-hover/assistant-turn:opacity-100 focus-within:opacity-100",
               )}
             >
               {hasHookActions ? (
                 <ConversationHookDetailsAction rows={unit.hookInvocations} turnId={unit.turnId} />
               ) : null}
-              <ConnectedBotGroupDeliveryAction
-                turnId={unit.turnId}
-                sourceCommandIds={deliverySourceCommandIds}
-              />
             </MessageActions>
           ) : null}
           {showHighspeedOutputFooter ? (
@@ -1653,9 +1621,6 @@ function ConversationTurnGroupImpl({
           highspeedMeta={highspeedMeta}
         />
       )}
-      {unit.topicPreparations?.length ? (
-        <BotTopicPreparation items={unit.topicPreparations} />
-      ) : null}
     </section>
   );
 }

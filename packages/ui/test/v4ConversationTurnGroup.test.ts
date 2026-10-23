@@ -1,7 +1,5 @@
 import { readFileSync } from "node:fs";
-import { createElement, type ContextType } from "react";
-import { DeliveryContext } from "@/v4/botGroupDeliveryContext.js";
-import { withTopicPreparationMessages } from "@/v4/topicPreparationRenderUnits.js";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { IPlatformService } from "@zcode/shared";
@@ -46,11 +44,6 @@ vi.mock("@/hooks/useServices.js", () => ({
   useOptionalServices: () => ({
     highspeedCardService: { share: vi.fn() },
   }),
-}));
-const topicInterrupted = vi.hoisted(() => vi.fn(() => false));
-vi.mock("@/v4/botGroupDeliveryContext.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/v4/botGroupDeliveryContext.js")>()),
-  useBotTopicInterruption: topicInterrupted,
 }));
 
 const rowContext: ConversationRowRenderContext = {
@@ -300,7 +293,6 @@ function renderUnit(
   unit: ConversationTurnRenderUnit,
   options: {
     locale?: "zh-CN" | "en-US";
-    botContext?: ContextType<typeof DeliveryContext>;
     chatLoadingBlockedByActiveWork?: boolean;
     chatLoadingBlockedByInteraction?: boolean;
     compactForRemoteControl?: boolean;
@@ -317,35 +309,31 @@ function renderUnit(
 ): string {
   return renderToStaticMarkup(
     createElement(
-      DeliveryContext.Provider,
-      { value: options.botContext ?? null },
+      ZCodeIntlProvider,
+      { initialLocale: options.locale ?? "zh-CN" },
       createElement(
-        ZCodeIntlProvider,
-        { initialLocale: options.locale ?? "zh-CN" },
+        PlatformProvider,
+        { platform: noopPlatform },
         createElement(
-          PlatformProvider,
-          { platform: noopPlatform },
-          createElement(
-            TooltipProvider,
-            null,
-            createElement(ConversationTurnGroup, {
-              unit,
-              nowMs: options.nowMs,
-              apiRetry: options.apiRetry,
-              context: {
-                ...rowContext,
-                chatLoadingBlockedByActiveWork: options.chatLoadingBlockedByActiveWork,
-                chatLoadingBlockedByInteraction: options.chatLoadingBlockedByInteraction,
-                compactForRemoteControl: options.compactForRemoteControl,
-                messageStreamShowReasoning: options.messageStreamShowReasoning,
-                messageStreamShowTodos: options.messageStreamShowTodos,
-                ...options.context,
-              },
-              onFork: options.onFork,
-              onRetry: options.onRetry,
-              onFeedbackChange: options.onFeedbackChange,
-            }),
-          ),
+          TooltipProvider,
+          null,
+          createElement(ConversationTurnGroup, {
+            unit,
+            nowMs: options.nowMs,
+            apiRetry: options.apiRetry,
+            context: {
+              ...rowContext,
+              chatLoadingBlockedByActiveWork: options.chatLoadingBlockedByActiveWork,
+              chatLoadingBlockedByInteraction: options.chatLoadingBlockedByInteraction,
+              compactForRemoteControl: options.compactForRemoteControl,
+              messageStreamShowReasoning: options.messageStreamShowReasoning,
+              messageStreamShowTodos: options.messageStreamShowTodos,
+              ...options.context,
+            },
+            onFork: options.onFork,
+            onRetry: options.onRetry,
+            onFeedbackChange: options.onFeedbackChange,
+          }),
         ),
       ),
     ),
@@ -1174,24 +1162,6 @@ describe("ConversationTurnGroup assistant history status", () => {
 
     expect(html).toContain("已工作 5 秒");
     expect(html).not.toContain("工作中 5 秒");
-  });
-
-  it("labels an authoritative topic interruption separately from a manual stop", () => {
-    topicInterrupted.mockReturnValue(true);
-    try {
-      const row = reasoningRow();
-      const unit = baseUnit({
-        workStatus: { state: "interrupted", durationMs: 1000 },
-        assistantHistoryDefaultOpen: true,
-        assistantWorkRows: [row],
-        assistantHistoryRows: [row],
-        renderRows: [row],
-      });
-      expect(renderUnit(unit, { locale: "zh-CN" })).toContain("已被新消息中断");
-      expect(renderUnit(unit, { locale: "en-US" })).toContain("Interrupted by a new message");
-    } finally {
-      topicInterrupted.mockReturnValue(false);
-    }
   });
 
   it("labels an interrupted turn as stopped without duration", () => {
@@ -2923,34 +2893,5 @@ describe("ConversationTurnGroup — 完成卡（workflow completion card）", ()
     expect(renderUnit(running, { context: COMPLETION_JOIN })).not.toContain(
       'data-workflow-completion-card="true"',
     );
-  });
-});
-
-describe("topic preparation flow membership", () => {
-  it("renders preparing messages inside the conversation turn with a source loading indicator", () => {
-    const items = [
-      {
-        messageId: "pending-a",
-        senderName: "Alice",
-        text: "weather",
-        status: "preparing" as const,
-      },
-    ];
-    const unit = withTopicPreparationMessages([], [], items)[0]!;
-    const botContext = {
-      taskId: "task",
-      context: { activeTaskId: "task", group: { threadId: "topic" } },
-      busyId: null,
-      retryPreparation: async () => {},
-    } as NonNullable<ContextType<typeof DeliveryContext>>;
-    for (const compactForRemoteControl of [false, true]) {
-      const html = renderUnit(unit, { botContext, compactForRemoteControl });
-      expect(html).toContain('data-topic-preparation="pending-a"');
-      const preparation = html.indexOf('data-topic-preparation="pending-a"');
-      expect(html.indexOf("<section")).toBeLessThan(preparation);
-      expect(html.indexOf("</section>")).toBeGreaterThan(preparation);
-      expect(html).toContain('data-v4-user-input-collapsible-content="true"');
-      expect(html).toContain('aria-label="正在准备材料"');
-    }
   });
 });

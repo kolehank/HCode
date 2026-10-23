@@ -1,4 +1,3 @@
-import { channelReplyResultSchema } from "@zcode/shared";
 import { randomUUID } from "node:crypto";
 import type { TopicResourcePort } from "@zcode/contracts";
 import {
@@ -17,19 +16,6 @@ export function createProtocolTopicResourcePort(
   context: ZCodeProtocolAgentServerContext,
 ): TopicResourcePort {
   return {
-    async reply(request, options) {
-      options.signal.throwIfAborted();
-      return context.requestClient(
-        zcodeProtocolMethods.channelReply,
-        request,
-        channelReplyResultSchema,
-        {
-          signal: options.signal,
-          trace: options.trace ? protocolTraceFromTraceContext(options.trace) : undefined,
-          timeoutMs: 60_000,
-        },
-      );
-    },
     async read(request, options) {
       options.signal.throwIfAborted();
       const requestId = randomUUID();

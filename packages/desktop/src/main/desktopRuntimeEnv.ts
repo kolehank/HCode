@@ -418,10 +418,6 @@ function resolveBundledRuntimeToolBinaryPath(
   return candidates.find((candidate) => existsSync(candidate));
 }
 
-function resolveBundledLarkCliBinaryPath(): string | undefined {
-  return resolveBundledRuntimeToolBinaryPath("lark-cli", "lark-cli");
-}
-
 export function resolveBundledGlmBinaryPath(): string | undefined {
   return resolveBundledZCodeAgentBinaryPath();
 }
@@ -493,16 +489,10 @@ export function resolveDynamicWorkflowModeHostEnv(options: {
 
 export function buildHostProcessEnv(hostProcessLocalEnv: Record<string, string>) {
   const glmBinaryPath = resolveBundledGlmBinaryPath();
-  const larkCliBinaryPath = resolveBundledLarkCliBinaryPath();
   const resolvedGlmBinaryPath = resolveHostProcessBinaryEnv(
     "GLM_BINARY_PATH",
     hostProcessLocalEnv,
     glmBinaryPath,
-  );
-  const resolvedLarkCliBinaryPath = resolveHostProcessBinaryEnv(
-    "ZCODE_LARK_CLI_BINARY",
-    hostProcessLocalEnv,
-    larkCliBinaryPath,
   );
   const dataBaseDir = getDataBaseDir();
   const rawInheritedEnv = {
@@ -590,6 +580,5 @@ export function buildHostProcessEnv(hostProcessLocalEnv: Record<string, string>)
       ? { [ZCODE_CUA_BUNDLED_HELPER_APP_PATH_ENV]: bundledCuaHelperAppPath }
       : {}),
     ...(resolvedGlmBinaryPath ? { GLM_BINARY_PATH: resolvedGlmBinaryPath } : {}),
-    ...(resolvedLarkCliBinaryPath ? { ZCODE_LARK_CLI_BINARY: resolvedLarkCliBinaryPath } : {}),
   };
 }

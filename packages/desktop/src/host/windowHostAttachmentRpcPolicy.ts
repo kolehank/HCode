@@ -60,7 +60,6 @@ const WEB_REMOTE_REPLAYABLE_ALLOWED_CHANNELS = new Set<string>([
   ServiceChannels.Memory,
   ServiceChannels.OutputStyle,
   ServiceChannels.SettingsSync,
-  ServiceChannels.Bots,
   ServiceChannels.Feedback,
   ServiceChannels.PromptAttachmentTransfer,
   ServiceChannels.OffPeakTask,

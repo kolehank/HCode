@@ -45,10 +45,6 @@ const feedbackMocks = vi.hoisted(() => ({
 
 vi.mock("@/components/ui/toast.js", () => ({ toast: feedbackMocks.toast }));
 
-vi.mock("@/BotsDialog.js", () => ({
-  BotsDialog: () => createElement("div", { "data-testid": "bots-dialog" }),
-}));
-
 const platformMock = vi.hoisted(() => ({
   getWebRemoteControlStatus: vi.fn(async () => ({ status: "idle" })),
   startWebRemoteControl: vi.fn(async () => ({ status: "running" })),
@@ -246,7 +242,7 @@ describe("WebRemoteControlDialog layout", () => {
     expect(pollReuseIndex).toBeGreaterThan(-1);
   });
 
-  it("renders phone QR and bot channel entry cards in the remote control dialog", () => {
+  it("renders phone QR entry card in the remote control dialog", () => {
     const html = renderToStaticMarkup(
       createElement(WebRemoteControlDialog, {
         open: true,
@@ -257,24 +253,6 @@ describe("WebRemoteControlDialog layout", () => {
 
     expect(html).toContain('data-testid="web-remote-control-main-grid"');
     expect(html).toContain("webRemoteControl.mobileQr.title");
-    expect(html).toContain("webRemoteControl.botChannel.title");
-    expect(html).toContain("webRemoteControl.botChannel.weixin.title");
-    expect(html).toContain("webRemoteControl.botChannel.feishu.title");
-    expect(html).toContain("webRemoteControl.botChannel.lark.title");
-    expect(html).toContain("webRemoteControl.botChannel.telegram.title");
-    expect(html).toContain("login.oauth.regionTag.bigmodel");
-    expect(html).toContain("login.oauth.regionTag.zai");
-    expect(html).toContain('data-testid="web-remote-control-open-bots"');
-    expect(html).toContain("webRemoteControl.botChannel.manageBots");
-
-    const larkIndex = html.indexOf("webRemoteControl.botChannel.lark.title");
-    const larkTagIndex = html.indexOf("login.oauth.regionTag.zai");
-    const telegramIndex = html.indexOf("webRemoteControl.botChannel.telegram.title");
-    const openBotsIndex = html.indexOf('data-testid="web-remote-control-open-bots"');
-    expect(larkTagIndex).toBeGreaterThan(larkIndex);
-    expect(larkTagIndex).toBeLessThan(telegramIndex);
-    expect(telegramIndex).toBeGreaterThan(larkIndex);
-    expect(openBotsIndex).toBeGreaterThan(telegramIndex);
   });
 
   it("merges status and copy link inside the Scan from phone card", () => {
@@ -289,12 +267,10 @@ describe("WebRemoteControlDialog layout", () => {
     const scanCardIndex = html.indexOf('data-testid="web-remote-control-scan-card"');
     const connectionCardIndex = html.indexOf('data-testid="web-remote-control-connection-card"');
     const copyLinkIndex = html.indexOf('data-testid="web-remote-control-copy-link-row"');
-    const botChannelIndex = html.indexOf("webRemoteControl.botChannel.title");
 
     expect(scanCardIndex).toBeGreaterThan(-1);
     expect(connectionCardIndex).toBeGreaterThan(scanCardIndex);
     expect(copyLinkIndex).toBeGreaterThan(connectionCardIndex);
-    expect(copyLinkIndex).toBeLessThan(botChannelIndex);
     expect(html).toContain('data-testid="web-remote-control-connection-card"');
     expect(html).toContain('data-testid="web-remote-control-copy-link-row"');
     expect(html).toContain("webRemoteControl.statusDetail.idle");

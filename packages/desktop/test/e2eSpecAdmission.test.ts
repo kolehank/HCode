@@ -20,7 +20,7 @@ describe("desktop E2E environment-gated formal spec admission", () => {
     expect(scheduled.some((spec) => spec.includes("/manual-review/"))).toBe(false);
   });
 
-  it.each(["bots", "settings", "feedback"])(
+  it.each(["settings", "feedback"])(
     "keeps explicit %s candidates discoverable",
     (domain) => {
       const scheduled = resolveE2EScheduledSpecFiles({

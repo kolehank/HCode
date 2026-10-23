@@ -183,9 +183,8 @@ describe("Window Host 的 Source 重连与数据库启动整合", () => {
         return this;
       },
     };
-    const createLocalServices = vi.fn((params: { resolveBotProjectConnection: unknown }) => {
+    const createLocalServices = vi.fn(() => {
       events.push("local-services");
-      expect(params.resolveBotProjectConnection).toBeTypeOf("function");
       return services;
     });
     const run = runInNewContext(
@@ -235,7 +234,6 @@ describe("Window Host 的 Source 重连与数据库启动整合", () => {
         initializeHostApiNetworkTransportOwner: async (params: { establishOwner(): unknown }) =>
           params.establishOwner(),
         createLocalServices,
-        resolveBotProjectConnection() {},
         authorizeLocalMediaPreviewPath() {},
         runtimeProcessLifecycleReporter: {},
         runtimeTaskReporter: {},

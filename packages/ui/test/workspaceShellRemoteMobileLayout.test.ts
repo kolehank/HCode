@@ -62,10 +62,6 @@ vi.mock("@/v4/V4WorkspaceChatArea.js", () => ({
   },
 }));
 
-vi.mock("@/BotsDialog.js", () => ({
-  BotsDialog: () => createElement("div", { "data-testid": "bots-dialog" }),
-}));
-
 vi.mock("@/components/ui/resizable.js", () => ({
   ResizableHandle: ({ className }: { className?: string }) =>
     createElement("div", {

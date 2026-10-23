@@ -1,4 +1,3 @@
-import type { TraceContext } from "@zcode/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { zcodeProtocolMethods, zcodeProtocolMessageSchema } from "@zcode/shared";
 import { createProtocolTopicResourcePort } from "../src/zcode-protocol/topic-resource-port.js";
@@ -12,45 +11,6 @@ const request = {
   resourceIndex: 0,
 };
 describe("topic resource protocol port", () => {
-  it("sends a strict channel reply and trace through the existing Host reverse port", async () => {
-    const requestClient = vi.fn(async (method, params, _schema, options) => {
-      expect(
-        zcodeProtocolMessageSchema.parse({ id: "reply-1", method, params, trace: options.trace }),
-      ).toMatchObject({
-        method: zcodeProtocolMethods.channelReply,
-        trace: { traceId: "trace-reply" },
-      });
-      return { status: "unknown", deliveryId: "reply-delivery" };
-    });
-    const port = createProtocolTopicResourcePort({
-      requestClient,
-    } as unknown as ZCodeProtocolAgentServerContext);
-    const controller = new AbortController();
-    expect(
-      await port.reply!(
-        {
-          taskId: "task-a",
-          inputId: "input-a",
-          toolCallId: "call-a",
-          parts: [{ type: "mention", refId: "m1" }],
-        },
-        { signal: controller.signal, trace: { traceId: "trace-reply" } as TraceContext },
-      ),
-    ).toEqual({ status: "unknown", deliveryId: "reply-delivery" });
-    controller.abort();
-    await expect(
-      port.reply!(
-        {
-          taskId: "task-a",
-          inputId: "input-a",
-          toolCallId: "call-b",
-          parts: [{ type: "text", text: "hello" }],
-        },
-        { signal: controller.signal },
-      ),
-    ).rejects.toThrow();
-    expect(requestClient).toHaveBeenCalledTimes(1);
-  });
   it("propagates source identity and cancellation using the same request id", async () => {
     let finish!: (value: unknown) => void;
     const requestClient = vi.fn(

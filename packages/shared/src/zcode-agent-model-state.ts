@@ -2,7 +2,7 @@
 // 剩余 5 个导出：旧 configOptions 投影函数（formatModelPickerValue/normalizeAvailableZCodeMode/
 // getZCodeAgentModeSelectOptions/getZCodeAgentAvailableModes/
 // zcodeSessionSettingsToZCodeConfigOptions；B 类，死期=波次3）。
-// 消费者：services zcodeConfigOptions/botsService、UI zcodeSessionProjection 等旧栈。
+// 消费者：services zcodeConfigOptions、UI zcodeSessionProjection 等旧栈。
 // 2026-09 Guarded 收尾后，ZCODE_AGENT_MODE_OPTIONS 成为 Desktop/手机 Composer、Automation/OffPeak
 // 表单共用的唯一模式目录（UI zcodeSessionProjection / automationAgentConfigOptions 直接消费
 // getZCodeAgentAvailableModes / getZCodeAgentModeSelectOptions / normalizeAvailableZCodeMode）。

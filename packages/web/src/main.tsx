@@ -834,7 +834,6 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
       cancel: async () => {},
       cleanup: async () => {},
     }),
-    botsService: createUnsupportedHomeOnlyService<RootServices["botsService"]>("botsService"),
     fileWatcherService: createEmptyHomeOnlyService<RootServices["fileWatcherService"]>({
       watch: async () => ({ dispose: () => {} }),
     }),
