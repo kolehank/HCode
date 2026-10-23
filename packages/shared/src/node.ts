@@ -27,3 +27,7 @@ export {
   type NodeSelfResourceSampler,
   type NodeSelfResourceSamplerOptions,
 } from "./node/nodeSelfResourceTelemetry.js";
+export {
+  resolveCredentialMasterKey,
+  CREDENTIAL_MASTER_KEY_UNAVAILABLE_CODE,
+} from "./node/credentialMasterKey.js";

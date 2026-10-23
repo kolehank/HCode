@@ -10,7 +10,7 @@ import {
 } from "@zcode/shared";
 import type { ICredentialService } from "./credential.js";
 import {
-  createCredentialCipherProvider,
+  createCredentialCipherProviderAsync,
   type CredentialCipherProvider,
 } from "./providers/credentialCipherProvider.js";
 import { createServiceLogger } from "../logger/serviceLogger.js";
@@ -95,7 +95,33 @@ export interface LocalCredentialService extends ICredentialService {
 export function createCredentialService(
   dependencies: CredentialServiceDependencies = {},
 ): LocalCredentialService {
-  const cipherProvider = dependencies.cipherProvider ?? createCredentialCipherProvider();
+  // BYOK fork P2：cipher 改为惰性 async 构造（OS keychain 主密钥首次使用时解析并缓存；
+  // keychain 不可用则首次读写即抛 credential_master_key_unavailable，绝不静默降级）。
+  // legacy 密文（旧本机推导密钥）在 decrypt 时自动重加密迁移落盘。
+  type CipherProviderWithMigration = CredentialCipherProvider & {
+    decrypt(value: string, credentialKey?: string): string;
+  };
+  const resolveCipherProvider = async (): Promise<CipherProviderWithMigration> => {
+    const cipher = dependencies.cipherProvider
+      ? dependencies.cipherProvider
+      : await createCredentialCipherProviderAsync({
+          onLegacyValueMigrated: (key, plaintext, legacyValue) => {
+            // 迁移回调：旧密文读取成功后用新密钥重写。fire-and-forget；
+            // 写失败下次读取会再次触发迁移。对比原密文未变才改写（并发防护）。
+            void (async () => {
+              const cipherProvider = await resolveCipherProvider();
+              const credentialsFile = getCredentialsFile();
+              await withFileLock(credentialsFile, async () => {
+                const creds = await readAll(credentialsFile);
+                if (creds[key] !== legacyValue) return;
+                creds[key] = cipherProvider.encrypt(plaintext);
+                await writeAll(credentialsFile, creds);
+              });
+            })().catch(() => {});
+          },
+        });
+    return cipher as CipherProviderWithMigration;
+  };
 
   return {
     async recoverUnreadable(key, assertCurrent) {
@@ -109,7 +135,7 @@ export function createCredentialService(
         const rawValue = creds[validatedKey];
         if (rawValue === undefined) return null;
         try {
-          return cipherProvider.decrypt(rawValue);
+          return (await resolveCipherProvider()).decrypt(rawValue, validatedKey);
         } catch (error) {
           if (!isCredentialDecryptError(error)) throw error;
         }
@@ -133,13 +159,13 @@ export function createCredentialService(
         return null;
       }
 
-      return cipherProvider.decrypt(rawValue);
+      return (await resolveCipherProvider()).decrypt(rawValue, validatedKey);
     },
 
     async save(key: string, value: string, assertCurrent?: () => void): Promise<void> {
       const validatedKey = credentialKeySchema.parse(key);
       const validatedValue = credentialValueSchema.parse(value);
-      const encryptedValue = cipherProvider.encrypt(validatedValue);
+      const encryptedValue = (await resolveCipherProvider()).encrypt(validatedValue);
       const credentialsFile = getCredentialsFile();
       // desktop host 与 CLI adapter 是独立进程，进程内排队不能阻止 whole-file
       // read-modify-write 丢更新；共享目录锁必须覆盖读取、变更和原子替换全过程。

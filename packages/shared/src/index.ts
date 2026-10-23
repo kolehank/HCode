@@ -362,3 +362,7 @@ export {
 export * from "./request-security-edition/verification-policy.js";
 
 export * from "./conversation-share-tool-presentation.js";
+// BYOK fork P1d 修正：isHighspeedProviderId 是 CLI 协议 handler 消费的模型目录判定
+// （协议层形状），highspeed.ts 已整体保留，导出随之恢复。
+export { isHighspeedProviderId, highspeedMessageMetaSchema } from "./highspeed.js";
+export type { HighspeedMessageMeta } from "./highspeed.js";
