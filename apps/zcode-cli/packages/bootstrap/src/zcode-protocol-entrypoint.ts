@@ -175,11 +175,8 @@ export async function runZCodeProtocolAgent(
       logger,
       disposeLate: () => shutdownZCodeTelemetry(),
       create: () =>
-        prepareZCodeTelemetryEnv(runtimeEnv, {
-          cliVersion: options.version,
-          productVersion: options.env?.ZCODE_APP_VERSION,
-          runtimeSurface,
-        }),
+        // BYOK fork P0：遥测环境准备为 no-op 直通，deviceMid 恒 undefined。
+        prepareZCodeTelemetryEnv(runtimeEnv),
     });
     const telemetryDeviceMid = telemetryEnv.ZCODE_TELEMETRY_DEVICE_MID;
     mcpTelemetryTracker =

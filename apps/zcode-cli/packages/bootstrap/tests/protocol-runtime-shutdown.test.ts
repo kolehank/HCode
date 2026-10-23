@@ -7,11 +7,7 @@ import type { Logger } from "@zcode/contracts";
 import { createInMemorySessionEventStore } from "@zcode/adapters/storage";
 import { ZCodeProtocolAgentServer } from "../src/zcode-protocol/server.js";
 
-const telemetry = vi.hoisted(() => ({ shutdown: vi.fn(async () => {}) }));
-vi.mock("@zcode/telemetry", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@zcode/telemetry")>()),
-  shutdownPreparedModelTelemetry: telemetry.shutdown,
-}));
+// BYOK fork P0：@zcode/telemetry 已删除，其 shutdown step 与 mock 随之移除。
 
 afterEach(() => {
   vi.useRealTimers();

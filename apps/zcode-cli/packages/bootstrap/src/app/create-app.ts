@@ -29,7 +29,8 @@ import {
   type AmendWorkflowRunSettingsInput,
   type ResumeSessionResult,
 } from "@zcode/core";
-import { createModelTelemetry } from "@zcode/telemetry";
+// BYOK fork P0：@zcode/telemetry（OTLP）已删除，改为 no-op 接缝（turn 生命周期契约保持）。
+import { createModelTelemetry } from "../telemetry-noop.js";
 import {
   createRootTraceContext,
   traceContextToLogContext,
