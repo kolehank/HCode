@@ -59,9 +59,6 @@ vi.mock("@/hooks/usePlatform.js", () => ({
   usePlatform: () => platformMock,
 }));
 
-vi.mock("@/hooks/useOAuth.js", () => ({
-  useOAuth: () => ({ activeProvider: null, loadingProviders: false, refreshProviders: vi.fn() }),
-}));
 
 vi.mock("@/store/StoreProvider.js", () => ({
   useZCodeStore: (

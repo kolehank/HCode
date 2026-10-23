@@ -33,7 +33,7 @@ describe("createHomeOnlyWebRemoteControlServices", () => {
     const { createHomeOnlyWebRemoteControlServices } = await import("../src/main.js");
     const services = createHomeOnlyWebRemoteControlServices();
 
-    await expect(services.oauthService.restoreCachedSession()).resolves.toBeNull();
+    // BYOK fork P1b：oauthService 已删除，home-only services 不再提供。
     await expect(services.modelSelectionService.getView()).resolves.toEqual({
       revision: 0,
       providers: [],

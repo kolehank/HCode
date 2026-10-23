@@ -17,6 +17,7 @@ export function resolveZCodeBuiltinProviderConfigFilePath(options?: {
     );
   }
   // 开发态没有 resources 复制步骤，必须与构建注入的产品环境读取同一份源文件。
-  const filename = ZCODE_ENV === "production" ? "zcode-builtin.json" : "zcode-builtin.test.json";
+  // BYOK fork P1b：源文件统一切换为 byok-builtin.json（见 scripts/builtin-provider-config.mjs）。
+  const filename = "byok-builtin.json";
   return join(options?.appPath ?? app.getAppPath(), "../../config/provider", filename);
 }

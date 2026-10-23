@@ -114,7 +114,6 @@ export interface WorkspaceSettingsLayerProps {
   onOpenWorkspace?: () => void;
   onOpenRemoteWorkspace?: () => void;
   allowOpenWorkspace?: RootProps["allowOpenWorkspace"];
-  onLogin?: () => void;
   onLogout?: () => void;
   user?: UserInfo | null;
 }

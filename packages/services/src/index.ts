@@ -209,8 +209,6 @@ export type { SessionRealtimePort } from "./session/sessionRealtimePort.js";
 // FileWatcher service — IFileWatcherService is both a type (interface) and value (descriptor)
 export { IFileWatcherService } from "./fileWatcher/fileWatcher.js";
 
-// OAuth service — IOAuthService is both a type (interface) and value (descriptor)
-export { IOAuthService } from "./oauth/oauth.js";
 
 // BYOK fork P1a：usage-stats / coding-plan-subscription 模块删除；OffPeakClientConfig 类型移至 offPeakTask.js。
 

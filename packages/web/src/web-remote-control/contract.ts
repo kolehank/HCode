@@ -1,8 +1,11 @@
 import type { WebRemoteControlFailure, WebRemoteControlV2QrParams } from "@zcode/shared";
 import type { WebRemoteControlRelayV2Device } from "@zcode/shared/web-remote-relay";
-import type { WebOAuthProviderId } from "#src/auth/browserOAuthCredentialRepo.js";
-import type { WebAuthService } from "#src/auth/webAuthService.js";
 
+// BYOK fork P1b：OAuth 登录体系（src/auth/）已删除。手机远控的门禁契约保留，
+// 由入口注入实现；P3 三档鉴权落地前装配层恒为未登录态。
+export type WebOAuthProviderId = "zai" | "bigmodel";
+
+/** 设备页账号行的只读展示资料；不是登录事实，登录门禁仍以 JWT 为准。 */
 export interface WebRemoteControlDeviceGroup {
   deviceMid: string;
   name?: string;
@@ -17,7 +20,6 @@ export interface KnownDevice {
   platform?: string;
 }
 
-/** 设备页账号行的只读展示资料；不是登录事实，登录门禁仍以 JWT 为准。 */
 export interface WebRemoteControlDeviceListAccount {
   displayName: string;
   avatarUrl?: string;
@@ -47,14 +49,20 @@ export interface WebRemoteControlEntryConnection {
 
 export interface WebRemoteControlEntryOptions {
   // 浏览器 location/history/storage 经现有边界注入，不另存一份登录事实。
-  auth: Pick<WebAuthService, "getZCodeJwtToken" | "getActiveAccount" | "startLogin" | "logout">;
+  // BYOK fork P1b：原 Pick<WebAuthService, ...> 改为内联契约；P3 三档鉴权替换实现。
+  auth: {
+    getZCodeJwtToken(): string | null;
+    getActiveAccount(): { displayName: string; avatarUrl?: string; provider: WebOAuthProviderId } | null;
+    startLogin(options?: { appReturnTo?: string; provider?: WebOAuthProviderId }): void;
+    logout(): Promise<void>;
+  };
   getHref(): string;
   replaceHref(href: string): void;
   storage: Pick<Storage, "getItem" | "setItem">;
   locale: "zh-CN" | "en-US";
   devices(jwt: string, signal: AbortSignal): Promise<WebRemoteControlRelayV2Device[]>;
   subscribeVisible(listener: () => void): () => void;
-  loginOptions?: Parameters<WebAuthService["startLogin"]>[0];
+  loginOptions?: { appReturnTo?: string; provider?: WebOAuthProviderId };
   token(jwt: string, signal: AbortSignal): Promise<string>;
   connect(connection: WebRemoteControlEntryConnection): void;
   onView(view: WebRemoteControlEntryView): void;

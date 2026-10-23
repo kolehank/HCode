@@ -41,7 +41,10 @@ export async function resolveBuiltinProviderBuildEnvironment({
 /** @param {{root?: string, env?: Record<string, string | undefined>}} options */
 export async function loadBuiltinProviderConfig({ root = repositoryRoot, env = process.env } = {}) {
   const environment = await resolveBuiltinProviderBuildEnvironment({ root, env });
-  const filename = environment === "production" ? "zcode-builtin.json" : "zcode-builtin.test.json";
+  // BYOK fork P1b：内置 Provider 源切换为 byok-builtin.json（全部 api-key 模板、
+  // 空 providerRules）；上游 zcode-builtin.json / zcode-builtin.test.json 保留在仓库仅作对照，
+  // 不再参与装配与打包。test 环境沿用 byok 文件（无需独立 test 变体，模板均为通用第三方）。
+  const filename = "byok-builtin.json";
   const sourcePath = resolve(root, "config/provider", filename);
   try {
     const content = await readFile(sourcePath, "utf8");

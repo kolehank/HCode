@@ -337,7 +337,6 @@ export const ProjectSidebar = memo(function ProjectSidebar(props: ProjectSidebar
                 onSettingsButtonClick={openSettings}
                 onUsageClick={openSettings}
                 onUpgradeClick={upgrade}
-                onLogin={props.onLogin}
                 onLogout={props.onLogout}
                 user={props.user}
                 workspacePath={props.workspacePath}

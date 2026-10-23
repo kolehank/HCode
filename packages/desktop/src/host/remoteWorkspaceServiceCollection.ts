@@ -16,7 +16,6 @@ import {
   IZCodeSessionService,
   IBotsService,
   IFileWatcherService,
-  IOAuthService,
   IModelSelectionService,
   IProviderSettingsService,
   ISourceServerWorkspaceService,
@@ -76,7 +75,6 @@ export const REMOTE_WORKSPACE_RPC_REGISTRATIONS = [
   ["zcodeSessionService", IZCodeSessionService],
   ["botsService", IBotsService],
   ["fileWatcherService", IFileWatcherService],
-  ["oauthService", IOAuthService],
   ["providerSettingsService", IProviderSettingsService],
   ["modelSelectionService", IModelSelectionService],
   ["sourceServerWorkspaceService", ISourceServerWorkspaceService],
@@ -187,7 +185,6 @@ export function createServerRemoteWorkspaceServiceCollection(params: {
     .register(IZCodeSessionService, params.connectionServices.zcodeSessionService)
     .register(IBotsService, params.connectionServices.botsService)
     .register(IFileWatcherService, params.connectionServices.fileWatcherService)
-    .register(IOAuthService, params.connectionServices.oauthService)
     .register(IProviderSettingsService, params.connectionServices.providerSettingsService)
     .register(IModelSelectionService, params.connectionServices.modelSelectionService)
     .register(ISourceServerWorkspaceService, params.connectionServices.sourceServerWorkspaceService)

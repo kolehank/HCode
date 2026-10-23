@@ -18,7 +18,6 @@ export const REMOTE_WORKSPACE_RPC_CHANNELS = [
   "zcodeSessionService",
   "botsService",
   "fileWatcherService",
-  "oauthService",
   "providerSettingsService",
   "modelSelectionService",
   "mediaPreviewService",

@@ -291,7 +291,6 @@ const WorkspaceShellLayoutContent = memo(function WorkspaceShellLayoutComponent(
   onCancelRemoteProject,
   onReconnectRemoteWorkspace,
   onLogout,
-  onLogin,
   user,
   reconnectingRemoteWorkspaceKeys,
   remoteWorkspaceRecoveryByWorkspaceKey = EMPTY_REMOTE_WORKSPACE_RECOVERY_BY_WORKSPACE_KEY,
@@ -1962,7 +1961,6 @@ const WorkspaceShellLayoutContent = memo(function WorkspaceShellLayoutComponent(
       remoteWorkspaceRecoveryByWorkspaceKey={remoteWorkspaceRecoveryByWorkspaceKey}
       remoteWorkspaceErrorByWorkspaceKey={remoteWorkspaceErrorByWorkspaceKey}
       onLogout={onLogout}
-      onLogin={onLogin}
       user={user}
       isDesktop={isDesktop}
       isWebRemoteControl={isWebRemoteControlShell}

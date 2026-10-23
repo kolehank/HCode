@@ -25,14 +25,12 @@ import {
   parseSlashCommand,
 } from "./slash-commands.js";
 import { isWorkflowModeEnabled, WORKFLOW_DISABLED_NOTICE } from "../workflow-mode.js";
+// BYOK fork P1b：login-flow.ts 的 OAuth 选择列表/授权消息辅助已删除，
+// 仅保留 api-key 参数解析与结果格式化（login-api-key-flow.ts）。
 import {
-  buildLoginSelection,
-  emitLoginAuthorizeMessage,
-  formatLoginResult,
   formatProviderSetupResult,
-  loginSetupResponse,
   parseApiKeyLoginArgs,
-} from "./login-flow.js";
+} from "./login-api-key-flow.js";
 import { loginRequiredResponse } from "../tui-login-state.js";
 import type { CommandCenterDeps } from "./types.js";
 
@@ -83,99 +81,40 @@ export function createCommandCenter(deps: CommandCenterDeps): TuiSubmitPrompt {
         };
       }
 
+      // BYOK fork P1b：厂商 OAuth 登录已下线。/login 仅支持手动配置 Coding Plan
+      // api-key；浏览器授权（zai-coding-plan / bigmodel-coding-plan）与交互式选择
+      // 列表已随登录体系移除。
       if (command.name === "login") {
-        if (command.args.length === 0) {
+        const apiKeyCommand = parseApiKeyLoginArgs(command.args);
+        if (!apiKeyCommand) {
+          return {
+            mode: deps.getMode?.(),
+            response:
+              "Usage: /login [zai-coding-plan-api-key <api-key>|bigmodel-coding-plan-api-key <api-key>]",
+          };
+        }
+        if (!deps.configureApiKey) {
+          return {
+            mode: deps.getMode?.(),
+            response: "Manual API key setup is not available in this client.",
+          };
+        }
+        if (!apiKeyCommand.apiKey) {
           return {
             loginRequired: await isLoginRequired(deps),
             mode: deps.getMode?.(),
-            response: loginSetupResponse(deps.getLocale?.()),
-            selection: buildLoginSelection(deps.getLocale?.()),
+            response: `Usage: /login ${apiKeyCommand.kind} <api-key>`,
           };
         }
-        if (command.args === "zai-coding-plan") {
-          if (!deps.login) {
-            return {
-              mode: deps.getMode?.(),
-              response: "Z.AI Coding Plan login is not available in this client.",
-            };
-          }
-
-          return {
-            loginRequired: false,
-            mode: deps.getMode?.(),
-            response: formatLoginResult(
-              await deps.login({
-                abortSignal: options.abortSignal,
-                onAuthorizeUrl: async (data) => {
-                  await emitLoginAuthorizeMessage(
-                    options,
-                    data.authorize_url,
-                    "Z.AI",
-                    await deps.getApp(),
-                  );
-                },
-              }),
-            ),
-          };
-        }
-        if (command.args === "bigmodel-coding-plan") {
-          if (!deps.loginBigmodel) {
-            return {
-              mode: deps.getMode?.(),
-              response: "BigModel Coding Plan login is not available in this client.",
-            };
-          }
-
-          return {
-            loginRequired: false,
-            mode: deps.getMode?.(),
-            response: formatProviderSetupResult(
-              await deps.loginBigmodel({
-                abortSignal: options.abortSignal,
-                onAuthorizeUrl: async (data) => {
-                  await emitLoginAuthorizeMessage(
-                    options,
-                    data.authorize_url,
-                    "BigModel",
-                    await deps.getApp(),
-                  );
-                },
-              }),
-            ),
-          };
-        }
-
-        const apiKeyCommand = parseApiKeyLoginArgs(command.args);
-        if (apiKeyCommand) {
-          if (!deps.configureApiKey) {
-            return {
-              mode: deps.getMode?.(),
-              response: "Manual API key setup is not available in this client.",
-            };
-          }
-          if (!apiKeyCommand.apiKey) {
-            return {
-              loginRequired: await isLoginRequired(deps),
-              mode: deps.getMode?.(),
-              response: `Usage: /login ${apiKeyCommand.kind} <api-key>`,
-            };
-          }
-          return {
-            loginRequired: false,
-            mode: deps.getMode?.(),
-            response: formatProviderSetupResult(
-              await deps.configureApiKey({
-                apiKey: apiKeyCommand.apiKey,
-                providerId: apiKeyCommand.providerId,
-              }),
-            ),
-          };
-        }
-
         return {
+          loginRequired: false,
           mode: deps.getMode?.(),
-          response:
-            "Usage: /login [zai-coding-plan|bigmodel-coding-plan|zai-coding-plan-api-key <api-key>|bigmodel-coding-plan-api-key <api-key>]",
+          response: formatProviderSetupResult(
+            await deps.configureApiKey({
+              apiKey: apiKeyCommand.apiKey,
+              providerId: apiKeyCommand.providerId,
+            }),
+          ),
         };
       }
 

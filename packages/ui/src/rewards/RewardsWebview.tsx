@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button.js";
 import { EmbeddedWebsiteHeader } from "@/components/EmbeddedWebsiteHeader.js";
 
 export function RewardsWebview({ onClose }: { onClose: () => void }) {
-  const { credentialService, oauthService } = useServices();
+  const { credentialService } = useServices();
   const platform = usePlatform();
   const { intl, locale } = useZCodeIntl();
   const themePreference = useZCodeStore((s) => s.theme);
@@ -91,15 +91,13 @@ export function RewardsWebview({ onClose }: { onClose: () => void }) {
         );
         injectedIdentity.current = identity;
       }
-      const rawProvider = identity ? await oauthService.getActiveProvider() : null;
-      const provider =
-        rawProvider === "zai" ? "zai" : rawProvider === "bigmodel" ? "bigmodel" : null;
-      const [oauth, jwt] = provider
-        ? await Promise.all([
-            credentialService.load(`oauth:${provider}:access_token`),
-            credentialService.load("zcodejwttoken"),
-          ])
-        : [null, null];
+      // BYOK fork P1b：OAuth active provider 已删除，Rewards 恒为 anonymous 注入；
+      // zcode JWT 仍按凭据读取（存在则注入），不再读取 OAuth access token。
+      const provider = null;
+      const [oauth, jwt] = await Promise.all([
+        Promise.resolve(null),
+        identity ? credentialService.load("zcodejwttoken") : Promise.resolve(null),
+      ]);
       if (
         view.current !== element ||
         epoch !== generation.current ||
@@ -130,7 +128,7 @@ export function RewardsWebview({ onClose }: { onClose: () => void }) {
         logger.warn("[rewards] context injection failed");
       }
     }
-  }, [credentialService, oauthService, policy.dev, policy.e2e]);
+  }, [credentialService, policy.dev, policy.e2e]);
   const injectRef = useRef(inject);
   injectRef.current = inject;
   useEffect(() => {

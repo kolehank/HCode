@@ -17,7 +17,6 @@ export function WorkspaceSettingsLayer({
   onOpenWorkspace,
   onOpenRemoteWorkspace,
   allowOpenWorkspace,
-  onLogin,
   onLogout,
   user,
 }: WorkspaceSettingsLayerProps) {
@@ -44,7 +43,6 @@ export function WorkspaceSettingsLayer({
             onOpenWorkspace={onOpenWorkspace}
             onOpenRemoteWorkspace={onOpenRemoteWorkspace}
             allowOpenWorkspace={allowOpenWorkspace}
-            onLogin={onLogin}
             onLogout={onLogout}
             user={user}
           />
@@ -62,7 +60,6 @@ export function WorkspaceSettingsLayer({
           onOpenWorkspace={onOpenWorkspace}
           onOpenRemoteWorkspace={onOpenRemoteWorkspace}
           allowOpenWorkspace={allowOpenWorkspace}
-          onLogin={onLogin}
           onLogout={onLogout}
           user={user}
         />

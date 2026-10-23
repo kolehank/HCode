@@ -32,11 +32,6 @@ import {
   createAcknowledgedWebRemoteControlRelayProtocol,
 } from "@zcode/client";
 
-import { WebCallbackPage } from "./auth/WebCallbackPage.js";
-import { WebLoginPage } from "./auth/WebLoginPage.js";
-import { createWebAuthService } from "./auth/webAuthService.js";
-import { WEB_ZAI_OAUTH_CONFIG, resolveWebAuthDevReturnTo } from "./auth/webZaiOAuthConfig.js";
-import { parseOAuthState, resolveSafeAppReturnTo } from "./auth/oauthStateCodec.js";
 import { resolveWebCommunityUrl, resolveWebHelpConfig } from "./communityUrl.js";
 import type {
   IPlatformService,
@@ -217,7 +212,19 @@ async function resolveFeedbackUrl(): Promise<string | undefined> {
 // 浏览器标签页 / 手机切后台时禁用 CSS 动画，避免 DocumentTimeline 持有已卸载的 DOM 子树。
 installDocumentHiddenMotionPause();
 const root = createRoot(document.getElementById("root")!);
-const webAuthService = createWebAuthService();
+// BYOK fork P1b：OAuth 登录体系已删除（src/auth/）。手机远控门禁契约保留，
+// 恒为未登录态；P3 三档鉴权落地时替换此 stub。
+const webAuthService: {
+  getZCodeJwtToken(): string | null;
+  getActiveAccount(): null;
+  startLogin(_options?: { appReturnTo?: string; provider?: "zai" | "bigmodel" }): void;
+  logout(): Promise<void>;
+} = {
+  getZCodeJwtToken: () => null,
+  getActiveAccount: () => null,
+  startLogin: () => {},
+  logout: async () => {},
+};
 let isPageUnloading = false;
 
 // 初始化 Web 端流式 clientId，确保所有 hook 在首次渲染前就使用稳定 ID
@@ -280,36 +287,20 @@ function renderWebRemoteControlFailure(failure: WebRemoteControlFailure): void {
   );
 }
 
-function isWebOAuthCallback(params: URLSearchParams): boolean {
-  return (
-    // BYOK fork P1a：/share/callback 路由删除。
-    isWebRemoteControlOAuthCallback(new URL(window.location.href))
-  );
-}
-
-function renderWebAuthCallbackPage(): void {
+// BYOK fork P1b：OAuth 登录/回调页已删除。登录门禁（JWT）恒未登录，
+// 登录与回调视图统一渲染不可用提示；P3 三档鉴权落地时重接。
+function renderWebAuthUnavailablePage(): void {
   document.title = "ZCode - Web Remote Control Sign In";
-  const callbackState = parseOAuthState(
-    new URLSearchParams(window.location.search).get("state") ?? "",
-  );
-  const safeRetryTarget = resolveSafeAppReturnTo(callbackState?.app_return_to);
   root.render(
-    <WebCallbackPage
-      authService={webAuthService}
-      onSuccess={({ appReturnTo }) => {
-        window.location.replace(appReturnTo ?? "/remote/v4");
+    <WebRemoteControlFailureScreen
+      failure={{
+        reason: "unexpected-error",
+        message: "Sign-in is not available in this build.",
       }}
-      onRetry={() => {
-        window.location.replace(safeRetryTarget ?? "/remote/v4");
-      }}
+      locale={resolveWebRemoteControlScreenLocale(navigator.language)}
+      onReload={() => window.location.reload()}
     />,
   );
-}
-
-// BYOK fork P1a：会话分享落地页整体删除。
-function renderWebLoginPage(): void {
-  document.title = "ZCode - Web Remote Control Sign In";
-  root.render(<WebLoginPage onLogin={(provider) => remoteEntry.startLogin(provider)} />);
 }
 
 // 访问 window.localStorage 本身在部分浏览器会抛错，统一包在方法里交给调用方兜底。
@@ -332,14 +323,13 @@ const remoteEntry = new WebRemoteControlEntry({
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   },
-  loginOptions: { devReturnTo: resolveWebAuthDevReturnTo(WEB_ZAI_OAUTH_CONFIG) },
+  // BYOK fork P1b：loginOptions（OAuth dev return-to）随登录体系删除。
   token: createWebRemoteControlV2TokenClient(window.location.origin),
   connect: (connection) => {
     void bootstrapExternalRelayWebRemoteControl(connection);
   },
   onView: (view) => {
-    if (view.kind === "callback") renderWebAuthCallbackPage();
-    else if (view.kind === "login") renderWebLoginPage();
+    if (view.kind === "callback" || view.kind === "login") renderWebAuthUnavailablePage();
     else if (view.kind === "devices") {
       document.title = "ZCode - Web Remote Control";
       root.render(
@@ -848,17 +838,7 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
     fileWatcherService: createEmptyHomeOnlyService<RootServices["fileWatcherService"]>({
       watch: async () => ({ dispose: () => {} }),
     }),
-    oauthService: createEmptyHomeOnlyService<RootServices["oauthService"]>({
-      getProviders: async () => [],
-      getActiveProvider: async () => null,
-      restoreCachedSession: async () => null,
-      restoreCachedSessionState: async () => ({ status: "signed-out" }),
-      restoreSession: async () => null,
-      refreshToken: async () => {},
-      logout: async () => {},
-      logoutAll: async () => {},
-      cancelPending: async () => {},
-    }),
+    // BYOK fork P1b：oauthService 已删除；home-only services 不再提供。
     providerSettingsService: createEmptyHomeOnlyService<RootServices["providerSettingsService"]>({
       getView: async () => ({ revision: 0, providers: [] }),
       refresh: async () => ({ revision: 0, providers: [] }),
@@ -1926,15 +1906,11 @@ async function bootstrapExternalRelayWebRemoteControl(
 }
 
 async function bootstrapWebApp() {
-  const params = new URLSearchParams(window.location.search);
   if (isWebRemoteControlRoute() || isWebRemoteControlOAuthCallback(new URL(window.location.href))) {
     document.documentElement.lang = resolveWebRemoteControlScreenLocale(navigator.language);
   }
-  if (isWebOAuthCallback(params)) {
-    renderWebAuthCallbackPage();
-    return;
-  }
-
+  // BYOK fork P1b：OAuth 回调路由已删除；带 code/state 参数的旧链接由远控入口
+  // 以未登录态处理，P3 三档鉴权落地前显示登录不可用提示。
   // BYOK fork P1a：/share 路由不再存在。
 
   if (isWebRemoteControlRoute()) {

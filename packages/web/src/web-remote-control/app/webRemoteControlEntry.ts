@@ -7,7 +7,7 @@ import type {
 import type { WebRemoteControlRelayV2Device } from "@zcode/shared/web-remote-relay";
 import { parseWebRemoteControlExternalQrParams } from "@zcode/shared";
 import { WebRemoteControlV2ConnectionError } from "@zcode/shared/web-remote-relay";
-import type { WebOAuthProviderId } from "#src/auth/browserOAuthCredentialRepo.js";
+import type { WebOAuthProviderId } from "#src/web-remote-control/contract.js";
 import { groupWebRemoteControlDevices } from "#src/web-remote-control/domain/webRemoteControlDeviceGroups.js";
 import {
   readKnownDevices,

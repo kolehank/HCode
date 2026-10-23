@@ -5,7 +5,6 @@ export type QuickPickCommandIcon =
   | "diff"
   | "feedback"
   | "folder"
-  | "login"
   | "logout"
   | "message"
   | "mcp"
@@ -55,7 +54,6 @@ interface QuickPickCommandHandlers {
   openFeedback: () => void | Promise<void>;
   openCommunity: () => void | Promise<void>;
   openProductDocs: () => void | Promise<void>;
-  login?: () => void | Promise<void>;
   logout?: () => void | Promise<void>;
   toggleSidebar: () => void;
   toggleTerminal: () => void;
@@ -277,17 +275,8 @@ export function createQuickPickCommands({
       keywords: ["disconnect", "logout", "sign out", "断开连接", "登出"],
       run: handlers.logout,
     });
-  } else if (!isLoggedIn && handlers.login) {
-    commands.push({
-      id: "login",
-      sectionId: "app",
-      titleId: "quickPick.command.login",
-      icon: "login",
-      // 命令面板的账号动作对用户表达为“连接/断开连接”，搜索词也要同步。
-      keywords: ["connect", "login", "sign in", "连接", "登录"],
-      run: handlers.login,
-    });
   }
+  // BYOK fork P1b：quick pick「连接」命令随 OAuth 登录入口删除。
 
   return commands.filter(
     (command) =>

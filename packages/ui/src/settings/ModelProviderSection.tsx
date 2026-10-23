@@ -44,7 +44,12 @@ import { ProviderTemplatePicker } from "./model-provider-section/ProviderTemplat
 // BYOK fork P1a：CodingPlanLoginOptions 类型随购买链删除，用兼容别名。
 type CodingPlanLoginOptions = { initialTeamPlanKey?: string; eventText?: string; forceOAuth?: boolean };
 import { useModelProviderNavigation } from "./model-provider-section/useModelProviderNavigation.js";
-import { reportPresetSubscriptionSuccess } from "./model-provider-section/oauthActions.js";
+// BYOK fork P1b：oauthActions.ts（App OAuth 发起/订阅 telemetry）随登录体系删除；
+// 订阅成功 telemetry 以本地 no-op 调用保留调用点。
+async function reportPresetSubscriptionSuccess(_params: {
+  platform: ReturnType<typeof usePlatform>;
+  presetId: BuiltinModelProviderId;
+}): Promise<void> {}
 import {
   createCodingPlanProviderNodeKey,
   createCustomProviderNodeKey,
@@ -251,7 +256,7 @@ export function ModelProviderSection({
   const { intl, locale } = useZCodeIntl();
   const confirmDialog = useConfirmDialog();
   const platform = usePlatform();
-  const { modelSelectionService, oauthService, credentialService } = useServices();
+  const { modelSelectionService, credentialService } = useServices();
   const {
     modelProviders,
     providerTemplates,
@@ -828,12 +833,10 @@ export function ModelProviderSection({
           providerId,
           providerName,
         });
-        // ZAI/BigModel provider 已恢复为 App 登录镜像。
-        // 这里的 Unlink 必须走 provider logout，退出当前 active provider 并触发另一组 provider 恢复 Connect。
+        // BYOK fork P1b：OAuth provider logout 已删除；解绑只清理本地 domain 偏好与缓存。
         const nextProviderFamilyDomain = resolveLogoutProviderFamilyDomain({
           currentDomain: sharedSettings?.providerFamilyDomain,
         });
-        await oauthService.logout(providerId);
         // Coding Plan 官网 webview 使用独立持久 partition，provider Unlink 也属于账号边界。
         if (typeof platform.executeDesktopCommand === "function") {
           await platform.executeDesktopCommand(DesktopCommandIds.ClearCodingPlanWebviewStorage);
@@ -863,7 +866,6 @@ export function ModelProviderSection({
       }
     },
     [
-      oauthService,
       platform,
       updateSharedSettings,
       sharedSettings?.providerFamilyDomain,

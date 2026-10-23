@@ -208,12 +208,8 @@ export const runPrompt = async (
     if (prepareTelemetry) {
       shutdownTelemetry = deps.shutdownZCodeTelemetry ?? bootstrapModule?.shutdownZCodeTelemetry;
     }
-    const appEnv = prepareTelemetry
-      ? await prepareTelemetry(env, {
-          cliVersion: version,
-          productVersion: env.ZCODE_APP_VERSION,
-        })
-      : env;
+    // BYOK fork P0：telemetry 环境准备为 no-op 直通（单参签名）。
+    const appEnv = prepareTelemetry ? await prepareTelemetry(env) : env;
     const startProviderRegistryRuntime =
       deps.startProcessProviderRegistryRuntime ??
       bootstrapModule?.startProcessProviderRegistryRuntime;

@@ -20,8 +20,6 @@ import { dispatchTaskNotification } from "./desktopNotifications.js";
 import {
   clearOAuthRoutesForWindow,
   deliverPendingDeepLink,
-  parseOAuthStateRegistration,
-  registerOAuthState,
 } from "./desktopOAuthDeepLink.js";
 import {
   registerWebRemoteControlIpcHandlers,
@@ -235,15 +233,7 @@ export function registerRemoteIpcHandlers(options: {
     webRemoteControlManager: options.webRemoteControlManager,
   });
 
-  ipcMain.on(PlatformChannels.OAuthRegisterState, (event, payload: unknown) => {
-    const registration = parseOAuthStateRegistration(payload);
-    if (!registration) {
-      options.logger.warn("[oauth-register-state] invalid payload", payload);
-      return;
-    }
-
-    registerOAuthState(event.sender.id, registration);
-  });
+  // BYOK fork P1b：OAuthRegisterState IPC（登录 state→window 注册）已删除。
 
   ipcMain.on(PlatformChannels.OpenExternal, (event, payload: unknown) => {
     const request = parseOpenExternalRequest(payload);
@@ -292,8 +282,8 @@ export function registerRemoteIpcHandlers(options: {
   );
 
   // BYOK fork P0：RendererReady 的遥测通知、SyncTelemetryContext、ReportTelemetryEvent、
-  // ReportArmsCustomEvent 与 OAuthCallbackHandled 遥测副作用已删除；RendererReady 仅保留
-  // deep-link 投递（OAuth 链路 P1b 退役后再清理该通道）。
+  // ReportArmsCustomEvent 与 OAuthCallbackHandled 已删除；RendererReady 仅保留
+  // workspace/payment/share deep-link 投递（BYOK fork P1b）。
   ipcMain.on(PlatformChannels.RendererReady, (event) => {
     deliverPendingDeepLink(event.sender);
   });

@@ -25,7 +25,6 @@ import type { IZCodeSessionService } from "./zcode-session/zcodeSession.js";
 import type { ICuaPermissionService } from "./cua-permission-broker/cuaPermissionService.js";
 import type { IBotsService } from "./bots/bots.js";
 import type { IFileWatcherService } from "./fileWatcher/fileWatcher.js";
-import type { IOAuthService } from "./oauth/oauth.js";
 import type { IModelSelectionService, IProviderSettingsService } from "./model-provider/providerFacadeServices.js";
 // BYOK fork P1a：usage-stats / coding-plan-subscription / client-config / feedback / conversation-share 均为厂商云功能，模块删除。
 import type { IClientScenesService } from "./client-scenes/clientScenes.js";
@@ -75,7 +74,6 @@ export interface IServiceAccessor {
   readonly cuaPermissionService?: ICuaPermissionService;
   readonly botsService: IBotsService;
   readonly fileWatcherService: IFileWatcherService;
-  readonly oauthService: IOAuthService;
   /** 当前 Environment 的 Provider 配置与设置视图。 */
   readonly providerSettingsService: IProviderSettingsService;
   /** 当前 Environment Registry 发布的唯一模型选择 View。 */

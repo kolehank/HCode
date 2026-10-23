@@ -1,10 +1,9 @@
-import { BUILTIN_MODEL_PROVIDER_IDS, type AppSettings, type OAuthProviderId } from "@zcode/shared";
+import { BUILTIN_MODEL_PROVIDER_IDS, type AppSettings } from "@zcode/shared";
 import { describe, expect, it, vi } from "vitest";
 import { ensureProviderFamilyDomainMigration } from "@/lib/providerFamilyDomainMigration.js";
 
 function createServices(params: {
   settings?: Partial<AppSettings>;
-  activeProvider?: OAuthProviderId | null;
   selectableProviderIds?: string[];
 }) {
   const update = vi.fn(async (_patch: Partial<AppSettings>) => {});
@@ -18,9 +17,6 @@ function createServices(params: {
         ...params.settings,
       })),
       update,
-    },
-    oauthService: {
-      getActiveProvider: vi.fn(async () => params.activeProvider ?? null),
     },
     modelSelectionService: {
       getView: vi.fn(async () => ({
@@ -39,18 +35,7 @@ function createServices(params: {
 }
 
 describe("ensureProviderFamilyDomainMigration", () => {
-  it("从旧 active OAuth provider 迁移 providerFamilyDomain", async () => {
-    const services = createServices({ activeProvider: "zai" });
-
-    await ensureProviderFamilyDomainMigration(services);
-
-    expect(services.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        providerFamilyDomain: "zai",
-        providerFamilyDomainMigrated: true,
-      }),
-    );
-  });
+  // BYOK fork P1b：OAuth active provider 迁移源已删除；仅从模型选择视图推断。
 
   it("没有 active OAuth 时从唯一可用 Account Provider 推断", async () => {
     const services = createServices({
@@ -89,9 +74,8 @@ describe("ensureProviderFamilyDomainMigration", () => {
     );
   });
 
-  it("active provider 和 provider 缓存都未恢复时暂不标记已迁移", async () => {
+  it("provider 缓存未恢复时暂不标记已迁移", async () => {
     const services = createServices({
-      activeProvider: null,
       selectableProviderIds: [],
     });
 
@@ -106,7 +90,6 @@ describe("ensureProviderFamilyDomainMigration", () => {
         providerFamilyDomain: "bigmodel",
         providerFamilyDomainMigrated: true,
       },
-      activeProvider: "zai",
     });
 
     await ensureProviderFamilyDomainMigration(services);

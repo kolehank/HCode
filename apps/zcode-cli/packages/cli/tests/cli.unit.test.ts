@@ -977,43 +977,16 @@ test("zcode commands list prints custom commands", async () => {
   assert.match(ctx.stdout.output(), /\/review \[scope\]/);
 });
 
-test("zcode login runs OAuth flow and prints the authorization URL", async () => {
+// BYOK fork P1b：厂商 OAuth 登录已删除；`zcode login` 只打印 API Key 配置指引。
+test("zcode login prints the BYOK api-key hint instead of OAuth", async () => {
   const ctx = createContext(["login", "--no-browser"]);
-  let sawNoBrowser = false;
   const exitCode = await run(ctx, {
     ...createPromptDeps(),
-    loginZCodeCli: async (options) => {
-      sawNoBrowser = options?.noBrowser === true;
-      await options?.onAuthorizeUrl?.({
-        authorize_url: "https://chat.z.ai/oauth/authorize?state=state",
-        expires_at: 1735000000,
-        flow_id: "flow-1",
-        poll_interval_sec: 2,
-        poll_token: "poll-token",
-      });
-      return {
-        configPath: "/home/test/.zcode/v2/model-selection.json",
-        credentialsPath: "/home/test/.zcode/v2/credentials.json",
-        model: "zai/glm-5.1",
-        providerId: "zai",
-        user: {
-          user_id: "u_1",
-          email: "alice@example.com",
-          name: "Alice",
-        },
-      };
-    },
   });
 
-  assert.equal(exitCode, 0);
-  assert.equal(sawNoBrowser, true);
-  assert.match(ctx.stdout.output(), /Open this URL to sign in/);
-  assert.match(ctx.stdout.output(), /https:\/\/chat\.z\.ai\/oauth\/authorize/);
-  assert.match(ctx.stdout.output(), /Login successful as Alice/);
-  assert.match(
-    ctx.stdout.output(),
-    /Model selection: \/home\/test\/\.zcode\/v2\/model-selection\.json/,
-  );
+  assert.equal(exitCode, 1);
+  assert.match(ctx.stdout.output(), /not available in this build/);
+  assert.match(ctx.stdout.output(), /api-key/);
 });
 
 test("zcode logout clears shared OAuth credentials", async () => {
@@ -1055,19 +1028,11 @@ test("parses login and logout slash commands", () => {
   });
 });
 
-test("command center handles login and logout locally", async () => {
-  let loginCalled = false;
-  let loginAbortSignal: AbortSignal | undefined;
+// BYOK fork P1b：厂商 OAuth 登录已删除；/login 仅支持手动 API Key 配置。
+test("command center handles api-key login and logout locally", async () => {
   let apiKeyCalled = false;
   let logoutCalled = false;
-  const emittedEvents: Array<{
-    payload?: unknown;
-    sessionId?: unknown;
-    traceId?: unknown;
-    type?: string;
-  }> = [];
   const commandCenter = createCommandCenter({
-    // 授权链接消息归属当前活动会话（TUI 首帧后已创建 App），但登录流程本身不向模型提交 prompt。
     getApp: async () =>
       ({
         sessionId: "session-login",
@@ -1076,27 +1041,6 @@ test("command center handles login and logout locally", async () => {
           throw new Error("login must not submit a model prompt");
         },
       }) as never,
-    login: async (options) => {
-      loginCalled = true;
-      loginAbortSignal = options?.abortSignal;
-      await options?.onAuthorizeUrl?.({
-        authorize_url: "https://chat.z.ai/oauth/authorize?state=state",
-        expires_at: 1735000000,
-        flow_id: "flow-1",
-        poll_interval_sec: 2,
-      });
-      return {
-        configPath: "/home/test/.zcode/v2/model-selection.json",
-        credentialsPath: "/home/test/.zcode/v2/credentials.json",
-        model: "zai/glm-5.1",
-        providerId: "zai",
-        user: {
-          user_id: "u_1",
-          email: "alice@example.com",
-          name: "Alice",
-        },
-      };
-    },
     configureApiKey: async (options) => {
       apiKeyCalled = options.providerId === "bigmodel" && options.apiKey === "manual-key";
       return {
@@ -1116,46 +1060,23 @@ test("command center handles login and logout locally", async () => {
     },
   });
 
-  const pickerResult = await commandCenter("/login", {});
-  const loginAbort = new AbortController();
-  const loginResult = await commandCenter("/login zai-coding-plan", {
-    abortSignal: loginAbort.signal,
-    onEvent: async (event) => {
-      emittedEvents.push(event);
-    },
-  } as never);
+  const usageResult = await commandCenter("/login", {});
+  const oauthAttempt = await commandCenter("/login zai-coding-plan", {});
+  const missingKeyResult = await commandCenter("/login bigmodel-coding-plan-api-key", {});
   const apiKeyResult = await commandCenter("/login bigmodel-coding-plan-api-key manual-key", {});
   const logoutResult = await commandCenter("/logout", {});
 
-  assert.equal(pickerResult.selection?.items.length, 4);
-  assert.equal(pickerResult.selection?.filterable, false);
-  assert.equal(
-    pickerResult.selection?.items[0]?.pending?.primary,
-    "Waiting for Z.AI authorization",
-  );
-  assert.equal(pickerResult.selection?.items[2]?.input?.primary, "Enter Z.AI Coding Plan API Key");
-  assert.equal(pickerResult.selection?.items[2]?.input?.mask, true);
-  assert.equal(loginAbortSignal, loginAbort.signal);
-  assert.equal(loginCalled, true);
+  assert.match(usageResult.response, /Usage: \/login \[zai-coding-plan-api-key/);
+  assert.match(oauthAttempt.response, /Usage: \/login \[zai-coding-plan-api-key/);
+  assert.match(missingKeyResult.response, /Usage: \/login bigmodel-coding-plan-api-key <api-key>/);
   assert.equal(apiKeyCalled, true);
-  assert.equal(logoutCalled, true);
-  assert.equal(emittedEvents[0]?.type, "assistant_message");
-  assert.equal(emittedEvents[0]?.sessionId, "session-login");
-  assert.equal(emittedEvents[0]?.traceId, "trace-login");
-  assert.match(
-    String((emittedEvents[0]?.payload as { content?: string } | undefined)?.content),
-    /https:\/\/chat\.z\.ai\/oauth\/authorize/,
-  );
-  assert.match(loginResult.response, /Configured Z\.AI Coding Plan as Alice/);
-  assert.match(
-    loginResult.response,
-    /Model selection: \/home\/test\/\.zcode\/v2\/model-selection\.json/,
-  );
   assert.match(apiKeyResult.response, /Configured BigModel Coding Plan/);
+  assert.equal(logoutCalled, true);
   assert.match(logoutResult.response, /Logged out from Coding Plan accounts/);
 });
 
-test("command center localizes the Coding Plan setup picker", async () => {
+// BYOK fork P1b：/login 的交互式选择列表已随 OAuth 登录删除；本地化断言改为 usage 文案。
+test("command center rejects oauth login with usage hint", async () => {
   const commandCenter = createCommandCenter({
     getApp: async () => {
       throw new Error("app should not be created");
@@ -1168,13 +1089,7 @@ test("command center localizes the Coding Plan setup picker", async () => {
 
   const result = await commandCenter("/login", {});
 
-  assert.equal(result.response, "选择 Coding Plan 提供商的配置方式。");
-  assert.equal(result.selection?.title, "配置 Coding Plan");
-  assert.equal(result.selection?.prompt, "选择登录或 API key 配置方式。");
-  assert.equal(result.selection?.filterable, false);
-  assert.match(result.selection?.items[0]?.secondary ?? "", /打开浏览器登录/);
-  assert.equal(result.selection?.items[2]?.input?.primary, "输入 Z.AI Coding Plan API Key");
-  assert.equal(result.selection?.items[2]?.input?.placeholder, "粘贴 API key");
+  assert.match(result.response, /Usage: \/login \[zai-coding-plan-api-key/);
 });
 
 test("command center keeps local commands usable before login", async () => {

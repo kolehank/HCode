@@ -1,17 +1,22 @@
 import type { ZCodeEnv } from "./env.js";
 
-export const DEFAULT_ZCODE_ENDPOINT_ORIGIN = "https://zcode.z.ai";
-export const TEST_ZCODE_ENDPOINT_ORIGIN = "https://zcode.z.ai";
+// BYOK fork P1b：产品云默认端点 fail-closed（.invalid 占位，运行时不可达）。
+// 模型推理端点不在此列——BYOK 的模型流量只指向用户在 Provider 设置里自配的 baseUrl
+// （byok-builtin.json 模板）。厂商 OAuth/业务端点常量随登录体系删除保留为 .invalid，
+// 供类型与旧配置迁移兼容；fork:guard 允许 .invalid 占位。
+export const DEFAULT_ZCODE_ENDPOINT_ORIGIN = "https://zcode.invalid";
+export const TEST_ZCODE_ENDPOINT_ORIGIN = "https://zcode.invalid";
 export const CODING_PLAN_LOCAL_WEBVIEW_ORIGIN = "http://localhost:3000";
-export const DEFAULT_BIGMODEL_API_ORIGIN = "https://bigmodel.cn";
-export const TEST_BIGMODEL_API_ORIGIN = "https://bigmodel.cn";
-export const DEFAULT_ZAI_OAUTH_ORIGIN = "https://chat.z.ai";
-export const TEST_ZAI_OAUTH_ORIGIN = "https://chat.z.ai";
-export const DEFAULT_ZAI_BUSINESS_BASE_URL = "https://api.z.ai";
-export const TEST_ZAI_BUSINESS_BASE_URL = "https://api.z.ai";
-export const DEFAULT_ZAI_OAUTH_CLIENT_ID = "client_P8X5CMWmlaRO9gyO-KSqtg";
-export const TEST_ZAI_OAUTH_CLIENT_ID = "client_P8X5CMWmlaRO9gyO-KSqtg";
-export const DEFAULT_WEB_REMOTE_CONTROL_RELAY_WS_URL = "wss://zcode.z.ai/api/v1/remote/ws2";
+export const DEFAULT_BIGMODEL_API_ORIGIN = "https://bigmodel.invalid";
+export const TEST_BIGMODEL_API_ORIGIN = "https://bigmodel.invalid";
+export const DEFAULT_ZAI_OAUTH_ORIGIN = "https://chat.z.ai.invalid";
+export const TEST_ZAI_OAUTH_ORIGIN = "https://chat.z.ai.invalid";
+export const DEFAULT_ZAI_BUSINESS_BASE_URL = "https://api.z.ai.invalid";
+export const TEST_ZAI_BUSINESS_BASE_URL = "https://api.z.ai.invalid";
+export const DEFAULT_ZAI_OAUTH_CLIENT_ID = "";
+export const TEST_ZAI_OAUTH_CLIENT_ID = "";
+// 官方跨网中继 WS（P3 随 relay 链路删除）；先置为 .invalid 防意外外呼。
+export const DEFAULT_WEB_REMOTE_CONTROL_RELAY_WS_URL = "wss://zcode.invalid/api/v1/remote/ws2";
 export const WEB_REMOTE_CONTROL_V4_MIN_APP_VERSION = "3.4.0";
 
 export interface BuildZCodeEndpointUrlsOptions {

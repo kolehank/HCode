@@ -20,12 +20,9 @@ import {
   prepareTuiAppRuntime,
 } from "./tui-prompt-handler-runtime.js";
 import { DEFAULT_CLI_CLEANUP_TIMEOUT_MS, runCliCleanupWithTimeout } from "./shutdown.js";
-import {
-  configureApiKeyForTui,
-  loginBigmodelForTui,
-  loginForTui,
-  logoutForTui,
-} from "./tui-auth.js";
+// BYOK fork P1b：tui-auth.ts 已随厂商 OAuth 登录删除；API Key 配置与登出
+// 的 TUI 适配迁至 tui-auth-stubs（无 OAuth 依赖）。
+import { configureApiKeyForTui, logoutForTui } from "./tui-auth-stubs.js";
 import {
   listCustomCommandsForTui,
   listSessionsForTui,
@@ -276,8 +273,6 @@ export function createTuiSubmitPrompt(
     listSessions: () => listSessionsForTui(deps),
     listSkills: () => listSkillsForTui(deps),
     configureApiKey: (options) => configureApiKeyForTui(deps, options),
-    login: (options) => loginForTui(deps, options),
-    loginBigmodel: (options) => loginBigmodelForTui(deps, options),
     loadCustomCommand: (name) => loadCustomCommandForTui(deps, name),
     newApp,
     recordInputHistory: async (input, kind) => {

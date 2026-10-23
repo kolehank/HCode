@@ -251,12 +251,6 @@ function renderRoot(options?: {
           load: vi.fn(async () => null),
           save: vi.fn(async () => {}),
         },
-        oauthService: {
-          restoreCachedSession: vi.fn(),
-          restoreSession: vi.fn(),
-          handleCallback: vi.fn(),
-          logout: vi.fn(),
-        },
       },
       platform: {
         selectDirectory: vi.fn(async () => null),
