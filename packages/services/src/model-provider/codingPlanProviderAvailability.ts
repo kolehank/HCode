@@ -24,10 +24,21 @@ import {
   resolveZaiStartPlanBalanceModelIds,
   type ZaiStartPlanBalanceEnvelope,
 } from "./zaiStartPlanBilling.js";
-import {
-  createBigModelLoginAuthHeaders,
-  createZaiLoginAuthHeaders,
-} from "../coding-plan-subscription/bigmodelCodingPlanSubscriptionProvider.js";
+// BYOK fork P1a：coding-plan-subscription 模块删除，这里内联其纯函数
+// 登录态业务头构造（bigmodel/zai 业务接口要求 Authorization 直接传 accessToken）。
+function createBigModelLoginAuthHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: token,
+    "Content-Type": "application/json",
+  };
+}
+
+function createZaiLoginAuthHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: token,
+    "Content-Type": "application/json",
+  };
+}
 
 const REQUEST_TIMEOUT_MS = 15_000;
 const log = createServiceLogger("coding-plan-availability");

@@ -26,13 +26,8 @@ import type { ICuaPermissionService } from "./cua-permission-broker/cuaPermissio
 import type { IBotsService } from "./bots/bots.js";
 import type { IFileWatcherService } from "./fileWatcher/fileWatcher.js";
 import type { IOAuthService } from "./oauth/oauth.js";
-import type {
-  IModelSelectionService,
-  IProviderSettingsService,
-} from "./model-provider/providerFacadeServices.js";
-import type { IUsageStatsService } from "./usage-stats/usageStats.js";
-import type { ICodingPlanSubscriptionService } from "./coding-plan-subscription/codingPlanSubscription.js";
-import type { IClientConfigService } from "./client-config/clientConfig.js";
+import type { IModelSelectionService, IProviderSettingsService } from "./model-provider/providerFacadeServices.js";
+// BYOK fork P1a：usage-stats / coding-plan-subscription / client-config / feedback / conversation-share 均为厂商云功能，模块删除。
 import type { IClientScenesService } from "./client-scenes/clientScenes.js";
 import type { ISkillsService } from "./skills/skills.js";
 import type { ISkillSyncService } from "./skill-sync/skillSync.js";
@@ -46,13 +41,11 @@ import type { IHooksService } from "./hooks/hooks.js";
 import type { IMemoryService } from "./memory/memory.js";
 import type { IOutputStyleService } from "./output-style/outputStyle.js";
 import type { ISettingsSyncService } from "./settings-sync/settingsSync.js";
-import type { IFeedbackService } from "./feedback/feedback.js";
 import type { IPromptAttachmentTransferService } from "./prompt-attachment-transfer/promptAttachmentTransfer.js";
 import type { IWindowControllerService } from "./window-controller/windowController.js";
 import type { ISourceServerWorkspaceService } from "./source-server-workspace/sourceServerWorkspace.js";
 import type { ISourceServerManagementService } from "./source-server-management/sourceServerManagement.js";
 import type { IOnboardingRecordService } from "./onboarding/onboardingRecord.js";
-import type { IConversationShareService } from "./conversation-share/conversationShare.js";
 
 /** UI 层消费的统一服务接口 */
 export interface IServiceAccessor {
@@ -80,7 +73,6 @@ export interface IServiceAccessor {
   readonly zcodeSessionService: IZCodeSessionService;
   // CUA 是 opt-in 内测特性：local macOS host 提供，远端 等 host 没有。可选避免连锁必填。
   readonly cuaPermissionService?: ICuaPermissionService;
-  readonly conversationShareService: IConversationShareService;
   readonly botsService: IBotsService;
   readonly fileWatcherService: IFileWatcherService;
   readonly oauthService: IOAuthService;
@@ -92,11 +84,10 @@ export interface IServiceAccessor {
   readonly sourceServerWorkspaceService: ISourceServerWorkspaceService;
   /** 仅桌面窗口 Host 的 base attachment 注册；远端 / Web 不提供。 */
   readonly sourceServerManagementService?: ISourceServerManagementService;
-  readonly usageStatsService: IUsageStatsService;
-  readonly codingPlanSubscriptionService: ICodingPlanSubscriptionService;
-  readonly clientConfigService: IClientConfigService;
+  // BYOK fork P1a：usageStatsService / codingPlanSubscriptionService / clientConfigService
+  // （厂商额度、订阅与远端配置）随模块删除。
   readonly clientScenesService: IClientScenesService;
-  /** 闲时任务管理（独立服务面）。 */
+  /** 闲时任务管理（独立服务面）。BYOK fork P1a：保留调度框架，仅删厂商云端点。 */
   readonly offPeakTaskService: IOffPeakTaskService;
   readonly highspeedCardService: IHighspeedCardService;
   readonly skillsService: ISkillsService;
@@ -119,6 +110,5 @@ export interface IServiceAccessor {
   readonly memoryService: IMemoryService;
   readonly outputStyleService: IOutputStyleService;
   readonly settingsSyncService: ISettingsSyncService;
-  readonly feedbackService: IFeedbackService;
   readonly promptAttachmentTransferService: IPromptAttachmentTransferService;
 }

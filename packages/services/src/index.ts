@@ -25,29 +25,7 @@ export {
 
 // Accessor
 export type { IServiceAccessor } from "./accessor.js";
-export {
-  ConversationShareServiceError,
-  createUnsupportedConversationShareService,
-  IConversationShareService,
-} from "./conversation-share/conversationShare.js";
-export type {
-  ConversationShareSelection,
-  ConversationSharePublishProgress,
-  ConversationShareImportProgress,
-  ImportConversationShareInput,
-  ImportConversationShareResult,
-  ImportedConversationShare,
-  ConversationShareServiceErrorKind,
-  ConversationShareFailureIssue,
-  ConversationShareFailureIssueCode,
-  ConversationSharePreflightInput,
-  ConversationSharePreflightResult,
-  ConversationShareAllowedArtifact,
-  ConversationShareTurnPreflightResult,
-  PublishTextConversationInput,
-} from "./conversation-share/conversationShare.js";
-// Conversation share 的具体实现依赖 Node 文件系统，只能从 @zcode/services/node 引入；
-// 根入口必须保持 browser-safe，避免 renderer 解析到 node:* 模块。
+// BYOK fork P1a：会话分享依赖厂商云 API，模块整体删除；shared 侧 zod schema 类型保留。
 export {
   createConversationTelemetryService,
   type ConversationTelemetryWorkspaceTarget,
@@ -234,18 +212,12 @@ export { IFileWatcherService } from "./fileWatcher/fileWatcher.js";
 // OAuth service — IOAuthService is both a type (interface) and value (descriptor)
 export { IOAuthService } from "./oauth/oauth.js";
 
-// UsageStats service — IUsageStatsService is both a type (interface) and value (descriptor)
-export { IUsageStatsService } from "./usage-stats/usageStats.js";
+// BYOK fork P1a：usage-stats / coding-plan-subscription 模块删除；OffPeakClientConfig 类型移至 offPeakTask.js。
 
 // Storage（资源管理器「存储」tab）：数据类型在 @zcode/shared；这里只导出服务接口与卷分组纯函数
 // StorageRootSpec 随契约再导出：desktop 的 Worker 协议按 contract.ts 的口径只从 services 入口取类型。
 export type { IStorageService, StorageRootSpec } from "./storage/contract.js";
 
-// CodingPlanSubscription service — ICodingPlanSubscriptionService is both a type (interface) and value (descriptor)
-export {
-  ICodingPlanSubscriptionService,
-  type OffPeakClientConfig,
-} from "./coding-plan-subscription/codingPlanSubscription.js";
 export {
   IClientScenesService,
   type ClientSceneConfig,
@@ -257,7 +229,7 @@ export {
 export { isValidCronExpr } from "./session/automationCronValidation.js";
 // 闲时任务管理服务（与 automation 服务面独立）；接口/描述符 browser-safe。
 export { IOffPeakTaskService } from "./session/offPeakTask.js";
-export type { OffPeakUpdateTaskParams } from "./session/offPeakTask.js";
+export type { OffPeakUpdateTaskParams, OffPeakClientConfig } from "./session/offPeakTask.js";
 
 // Skills service — ISkillsService is both a type (interface) and value (descriptor)
 export { ISkillsService } from "./skills/skills.js";
@@ -292,8 +264,7 @@ export { ICommandsService } from "./commands/commands.js";
 
 export { ISettingsSyncService } from "./settings-sync/settingsSync.js";
 
-export { IFeedbackService } from "./feedback/feedback.js";
-export type { FeedbackUploadProgress } from "./feedback/feedback.js";
+// BYOK fork P1a：IFeedbackService（飞书表单厂商通道）删除；shared 的 Feedback* 纯类型保留。
 export { IPromptAttachmentTransferService } from "./prompt-attachment-transfer/promptAttachmentTransfer.js";
 export type {
   PromptAttachmentStageParams,
@@ -373,8 +344,7 @@ export {
   type PluginUiSurfaceEntry,
   type PluginUiWorkspaceTarget,
 } from "./plugin-ui-bridge/contract.js";
-export { IClientConfigService } from "./client-config/clientConfig.js";
-
+// BYOK fork P1a：IClientConfigService（厂商远端配置）导出删除。
 export { IHighspeedCardService } from "./highspeed/highspeedCard.js";
 export {
   HighspeedCardService,

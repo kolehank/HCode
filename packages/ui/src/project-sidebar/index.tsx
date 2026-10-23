@@ -54,7 +54,7 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useTabStoreApi } from "@/store/TabStoreProvider.js";
 import { useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
 import { useZCodeStore } from "@/store/StoreProvider.js";
-import { useCodingPlanUpgradeDialog } from "@/settings/CodingPlanUpgradeDialogProvider.js";
+// BYOK fork P1a：购买弹窗删除。
 export { attachRemoteProjectWorkspace } from "@/project-sidebar/remote-navigation.js";
 export { resolveEntryProject } from "@/project-sidebar/view.js";
 export type {
@@ -84,7 +84,11 @@ export const ProjectSidebar = memo(function ProjectSidebar(props: ProjectSidebar
   const { intl, localePreference, setLocalePreference } = useZCodeIntl();
   const tabStore = useTabStoreApi();
   const setTheme = useZCodeStore((state) => state.setTheme);
-  const { openCodingPlanUpgrade } = useCodingPlanUpgradeDialog();
+  // BYOK fork P1a：购买弹窗删除，升级回调降级为 no-op。
+  const openCodingPlanUpgrade = (
+    _args: unknown,
+    _options?: unknown,
+  ): boolean => false;
   const { view, setView } = preferences;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [groupedToolbar, setGroupedToolbar] = useState<HTMLDivElement | null>(null);

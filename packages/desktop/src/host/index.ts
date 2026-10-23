@@ -39,7 +39,6 @@ import {
   IBotsService,
   ICredentialService,
   IFileService,
-  IClientConfigService,
   IMediaPreviewService,
   IOffPeakTaskService,
   IRemoteProjectService,
@@ -51,7 +50,6 @@ import {
   ISettingService,
   ISourceServerManagementService,
   IWindowControllerService,
-  IConversationShareService,
   IPromptAttachmentTransferService,
   IZCodeAgentService,
   IZCodeTaskService,
@@ -163,7 +161,7 @@ import { connectServerRemote, type ServerRemoteConnection } from "./serverRemote
 import { bindBotGroupTaskScope } from "./botGroupTaskScope.js";
 import { createWindowHostAttachmentRegistry } from "./windowHostAttachmentRegistry.js";
 import { exposeWindowHostAttachmentServices } from "./windowHostAttachmentRpcPolicy.js";
-import { scopeConversationShareServiceForAttachment } from "./conversationShareAttachmentService.js";
+// BYOK fork P1a：conversationShareAttachmentService 随会话分享删除。
 import {
   createWindowRemoteConnectionRegistry,
   type WindowRemoteConnectionCloseEvent,
@@ -1871,7 +1869,6 @@ async function createWindowRemoteConnectionHandle(params: {
   confirmSourceServerInstall?: boolean;
 }): Promise<WindowRemoteConnectionHandle<ServiceCollection, HostRemoteConnectionCapabilities>> {
   if (!activeServices) throw new Error("Local Host services are not initialized.");
-  const clientConfigService = activeServices.get(IClientConfigService);
   if (params.signal.aborted) {
     throw new Error("远程连接已取消");
   }
@@ -2049,7 +2046,6 @@ async function createWindowRemoteConnectionHandle(params: {
         },
       };
       services = createServerRemoteWorkspaceServiceCollection({
-        clientConfigService,
         connectionServices: reconnected.services,
         virtualProjects: reconnected.serverInfo.capabilities.virtualProjects,
         serverId: reconnected.serverInfo.serverId,
@@ -2069,7 +2065,6 @@ async function createWindowRemoteConnectionHandle(params: {
   }
 
   services = createServerRemoteWorkspaceServiceCollection({
-    clientConfigService,
     connectionServices: connection.services,
     virtualProjects: connection.serverInfo.capabilities.virtualProjects,
     serverId: connection.serverInfo.serverId,
@@ -2635,20 +2630,7 @@ function exposeServicesOnMessagePort(
   if (connectionScope) {
     overrides.set(IZCodeAgentService.channelName, connectionScope.service);
   }
-  const conversationShareService = services.getOptional(IConversationShareService);
-  if (conversationShareService) {
-    // Share service 若继续持有 raw Agent，会绕过当前 MessagePort 已握手的 trusted carrier，
-    // rowsRange 会以 connection untrusted 拒绝。必须复用同一 attachment connection scope。
-    overrides.set(
-      IConversationShareService.channelName,
-      scopeConversationShareServiceForAttachment(
-        conversationShareService,
-        clientMode,
-        connectionScope?.service,
-        connectionContext,
-      ),
-    );
-  }
+  // BYOK fork P1a：会话分享 attachment scope 包装删除。
   exposeWindowHostAttachmentServices({
     server,
     services,
@@ -3946,11 +3928,6 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
               zcodeBuiltinProviderConfigFilePath: msg.zcodeBuiltinProviderConfigFilePath,
               processLifecycleReporter: runtimeProcessLifecycleReporter,
               taskRuntimeReporter: runtimeTaskReporter,
-              feedback: {
-                getDeviceMid: () => msg.deviceMid,
-                apiBaseUrl: msg.feedbackApiBase,
-                createFullLogArchive: createFullFeedbackLogArchiveViaMain,
-              },
               forwardSessionMessageSendRequested: (request) => {
                 parentPort?.postMessage({
                   type: HostResponseTypes.SessionMessageSendRequested,

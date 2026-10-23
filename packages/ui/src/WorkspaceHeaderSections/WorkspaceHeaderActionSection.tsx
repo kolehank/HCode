@@ -4,7 +4,6 @@ import { WorkspaceTerminalToggleButton } from "@/WorkspaceTerminalToggleButton.j
 import { cn } from "@/components/lib/utils.js";
 import type { WorkspaceHeaderActionSectionProps } from "@/WorkspaceHeaderSections/shared.js";
 import { WorkspaceHelpMenuButton } from "@/WorkspaceHelpMenuButton.js";
-import { ConversationShareMenu } from "@/ConversationShareMenu.js";
 import { DesktopWindowControls } from "@/DesktopWindowControls.js";
 
 export type { WorkspaceHeaderActionSectionProps } from "@/WorkspaceHeaderSections/shared.js";
@@ -48,17 +47,7 @@ export function WorkspaceHeaderActionSection({
           onSelectedEditorChange={onSelectedEditorChange}
         />
       ) : null}
-      {/* 分享发布接口依赖登录态；未登录时隐藏入口，避免用户打开后只能得到鉴权失败。 */}
-      {activeTaskId &&
-      user &&
-      isDesktop !== false &&
-      !isWebRemoteControl &&
-      remoteTarget?.kind !== "server" ? (
-        <ConversationShareMenu
-          taskId={activeTaskId}
-          useWindowsCaptionSpacing={useWindowsCaptionSpacing}
-        />
-      ) : null}
+      {/* BYOK fork P1a：会话分享菜单删除（厂商云发布链）。 */}
       {!simplifyForNarrowRemote ? (
         <>
           {!hideHelpMenu ? <WorkspaceHelpMenuButton isDesktop={Boolean(isDesktop)} /> : null}

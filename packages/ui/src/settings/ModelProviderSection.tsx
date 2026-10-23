@@ -41,7 +41,8 @@ import {
 import { ModelProviderSectionDetail } from "./model-provider-section/Detail.js";
 import { ModelProviderSectionLayout } from "./model-provider-section/SectionLayout.js";
 import { ProviderTemplatePicker } from "./model-provider-section/ProviderTemplatePicker.js";
-import type { CodingPlanLoginOptions } from "./model-provider-section/codingPlanPricingCards.js";
+// BYOK fork P1a：CodingPlanLoginOptions 类型随购买链删除，用兼容别名。
+type CodingPlanLoginOptions = { initialTeamPlanKey?: string; eventText?: string; forceOAuth?: boolean };
 import { useModelProviderNavigation } from "./model-provider-section/useModelProviderNavigation.js";
 import { reportPresetSubscriptionSuccess } from "./model-provider-section/oauthActions.js";
 import {
@@ -423,12 +424,8 @@ export function ModelProviderSection({
   }, [authenticatedEnterpriseProducts, authenticatedZaiEnterpriseProducts]);
   const subscribedTeamProducts = useMemo(
     () => [
-      ...(authenticatedEnterpriseProducts.snapshot?.productList.filter(
-        (product) => product.subscribed === true,
-      ) ?? []),
-      ...(authenticatedZaiEnterpriseProducts.snapshot?.productList.filter(
-        (product) => product.subscribed === true,
-      ) ?? []),
+      // BYOK fork P1a：企业产品目录恒空，团队订阅列表为空数组。
+
     ],
     [
       authenticatedEnterpriseProducts.snapshot?.productList,
@@ -1154,26 +1151,7 @@ export function ModelProviderSection({
           selectedNavItem={selectedNavItem}
           navigationItems={navigationItems}
           connectionSettingsFailed={familyConnectionSettingsFailed}
-          startPlanSubscriptionCount={(() => {
-            const providerId =
-              selectedNavItem && "presetId" in selectedNavItem ? selectedNavItem.presetId : null;
-            const family = providerId
-              ? resolveModelProviderFamilySpecByProviderId(providerId)
-              : null;
-            const entitlement = family ? codingPlanEntitlements[family.startPlanProviderId] : null;
-            // 只展示当前 Family 已查询到的权益，不用当前是否选中 Start 代替拥有数量。
-            return entitlement?.error
-              ? 0
-              : (entitlement?.snapshot?.subscription?.details.length ?? 0);
-          })()}
           presetLoading={presetLoading}
-          codingPlanAuthError={oauthError}
-          codingPlanPurchaseTokenAuthenticatedByProviderId={
-            codingPlanPurchaseTokenAuthenticatedByProviderId
-          }
-          presetSubscriptionProviderId={presetSubscriptionProviderId}
-          codingPlanStatusSyncProviderId={codingPlanStatusSyncProviderId}
-          codingPlanDisconnectProviderId={codingPlanDisconnectProviderId}
           onSave={handleSave}
           onAddPersonalModel={addPersonalModel}
           onSavePersonalModelDraft={savePersonalModelDraft}
@@ -1184,15 +1162,6 @@ export function ModelProviderSection({
           // Provider 的 Effective 模型无法写入 Personal modelOrder。模型调序独立于成员来源。
           onReorderProviderModels={reorderProviderModels}
           onTestModel={handleTestModel}
-          onCodingPlanLogin={handleCodingPlanLogin}
-          onRetryCodingPlan={() => {
-            // 取 Key 失败不等于登录失效；沿用 Host 手动刷新，不清除 OAuth 或重新登录。
-            logger.info("[ModelProviderSection] 重试获取套餐状态");
-            return refresh().then(() =>
-              refreshCodingPlanEntitlements({ force: true, reason: "manual" }),
-            );
-          }}
-          onCodingPlanDisconnect={handleCodingPlanDisconnect}
           onOpenApiKeyUrl={handleOpenApiKeyUrl}
           onSelectNavItem={handleSelectNavItem}
           onOpenBigModelRegistration={() => {
@@ -1202,9 +1171,6 @@ export function ModelProviderSection({
               current === BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan ? null : current,
             );
             platform.openExternal(BIGMODEL_REGISTRATION_URL);
-          }}
-          onCodingPlanPurchaseComplete={async () => {
-            await refreshProviderPanelAfterAuthChange({ refreshReason: "purchase" });
           }}
         />
       )}

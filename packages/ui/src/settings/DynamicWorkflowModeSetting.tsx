@@ -27,7 +27,8 @@ import { useSettings } from "@/hooks/useSettingService.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { logger } from "@/logger.js";
 import { SettingsRow } from "@/settings/SettingsPageParts.js";
-import type { DynamicWorkflowAvailabilitySnapshot } from "@/store/dynamicWorkflowAvailabilityStore.js";
+// BYOK fork P1a：store 已删，类型改由 hooks stub 提供。
+import type { DynamicWorkflowAvailabilitySnapshot } from "@/hooks/useDynamicWorkflowAvailability.js";
 
 const MODE_ICONS: Record<DynamicWorkflowMode, ComponentType<SVGProps<SVGSVGElement>>> = {
   disabled: DynamicWorkflowOffIcon,
@@ -44,10 +45,11 @@ const MODE_ICONS: Record<DynamicWorkflowMode, ComponentType<SVGProps<SVGSVGEleme
 export function resolveDynamicWorkflowModeSettingView(
   snapshot: DynamicWorkflowAvailabilitySnapshot,
 ): { value: DynamicWorkflowMode; offeredMode: DynamicWorkflowMode } | null {
+  // BYOK fork P1a：远端灰度源删除，config 恒 null，本行不再出现。
   const config = snapshot.config;
   if (snapshot.status !== "ready" || !config) return null;
-  const offeredMode = readDynamicWorkflowOfferedMode(config);
-  return offeredMode ? { value: config.mode, offeredMode } : null;
+  const offeredMode = readDynamicWorkflowOfferedMode(config as never);
+  return offeredMode ? { value: offeredMode, offeredMode } : null;
 }
 
 /** 选回服务端提供的模式等于删除选择（空串哨兵，服务层归一成删除），安装继续跟随服务端翻转。 */

@@ -51,7 +51,6 @@ import { normalizeInterfaceMode } from "@/lib/interfaceMode.js";
 import type { Theme } from "@/useTheme.js";
 import { WorkspaceWebRemoteControlTrigger } from "@/WorkspaceWebRemoteControlTrigger.js";
 import {
-  WorkspaceSidebarFooterPlanBadge,
   WorkspaceSidebarFooterUsageSummaryContent,
   useWorkspaceSidebarFooterUsageSummaryState,
 } from "@/WorkspaceSidebarFooterUsageSummary.js";
@@ -283,7 +282,6 @@ export const WorkspaceSidebarFooter = memo(function WorkspaceSidebarFooterCompon
                         data-testid="profile-menu-plan"
                         className="flex shrink-0 [&>span]:border-border/50 [&>span]:bg-transparent [&>span]:font-normal"
                       >
-                        <WorkspaceSidebarFooterPlanBadge state={usageSummaryState} />
                       </span>
                     </div>
                     {user.id ? (

@@ -57,16 +57,9 @@ export async function prepareAccountConnectionSwitch(
       );
     // 未选中的 Team 没有可复用的 current 事实。按按钮的具体组织/项目查询，
     // 不能把团队名单存在或另一个 Team 的权益当成目标可用。
-    const { kind: planKind, ...identity } = selection;
-    const entitlement = await services.usageStatsService.getEntitlementSnapshot({
-      preferredProviderId: providerId,
-      includeSubscription: true,
-      accountAccess: { type: "zhipu-account", family, planKind, ...identity },
-      allowDisabledPreferredProvider: true,
-      requirePreferredProvider: true,
-      allowEnvApiKey: false,
-    });
-    return hasActiveUsageEntitlementSnapshot(entitlement, providerId);
+    // BYOK fork P1a：usage-stats 删除，Team 连接可用性无远端权益事实，按不可用处理。
+    void providerId;
+    return false;
   };
   let selection: ProviderFamilyConnectionSelection | undefined;
   let label: string | undefined;

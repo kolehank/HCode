@@ -44,7 +44,7 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { SSHDialog } from "@/SSHDialog.js";
 import { SettingsPage } from "@/SettingsPage.js";
 import { setPendingSettingsSectionIntent } from "@/lib/settingsNavigation.js";
-import { CodingPlanUpgradeDialogProvider } from "@/settings/CodingPlanUpgradeDialogProvider.js";
+// BYOK fork P1a：CodingPlanUpgradeDialogProvider（购买弹窗）删除。
 import { RewardsProvider } from "@/rewards/RewardsProvider.js";
 import { WelcomeScreen, type LoginCompleteReason } from "@/WelcomeScreen.js";
 import { setDefaultFileDisplayBasePath } from "@/lib/fileDisplay.js";
@@ -167,16 +167,14 @@ export function Root(props: RootProps) {
                       <AssistantCodeCommentFeatureProvider
                         enabled={props.assistantCodeCommentCardsEnabled}
                       >
-                        <CodingPlanUpgradeDialogProvider>
-                          <RewardsProvider desktop={props.isDesktop === true}>
-                            <RequestSecurityHost />
-                            <MarketingTouchProvider desktop={props.isDesktop === true}>
-                              <RemoteConnectionProgressProvider>
-                                <RootInner {...props} />
-                              </RemoteConnectionProgressProvider>
-                            </MarketingTouchProvider>
-                          </RewardsProvider>
-                        </CodingPlanUpgradeDialogProvider>
+                        <RewardsProvider desktop={props.isDesktop === true}>
+                          <RequestSecurityHost />
+                          <MarketingTouchProvider desktop={props.isDesktop === true}>
+                            <RemoteConnectionProgressProvider>
+                              <RootInner {...props} />
+                            </RemoteConnectionProgressProvider>
+                          </MarketingTouchProvider>
+                        </RewardsProvider>
                       </AssistantCodeCommentFeatureProvider>
                     </WebRemoteControlFeatureProvider>
                   </DiffsWorkerPoolProvider>
@@ -250,7 +248,8 @@ function RootInner({
   // 动态工作流灰度快照的唯一取数点：
   // 放在 app 级 ServiceProvider 这一层取一次，自动化页与 run 面板只读。消费方可能位于
   // 工作区级 ServiceProvider 内（远程 Host 的 accessor），由它们取数会拿到另一台 Host 的答案。
-  useDynamicWorkflowAvailabilityLoader(services.codingPlanSubscriptionService);
+  // BYOK fork P1a：动态工作流灰度 loader 的厂商服务参数已删（stub 内部忽略）。
+  useDynamicWorkflowAvailabilityLoader(undefined);
 
   const { intl, locale } = useZCodeIntl();
   const handleRemoteConnectionTargetChange = useSourceServerUpdateNotifications({
@@ -278,7 +277,7 @@ function RootInner({
     settingsLoaded: Boolean(appSettings),
     userMode: appSettings?.dynamicWorkflowMode,
     zcodeAgentService: services.zcodeAgentService,
-    codingPlanSubscriptionService: services.codingPlanSubscriptionService,
+    // BYOK fork P1a：codingPlanSubscriptionService 已删（stub 内部忽略）。
   });
   const [welcomeScreenOpenReason, setWelcomeScreenOpenReason] =
     useState<WelcomeScreenOpenReason | null>(() =>
@@ -1595,7 +1594,6 @@ function RootInner({
             >
               <RootWorkspaceContent
                 workspaceScopedServices={workspaceScopedServices}
-                baseFeedbackService={services.feedbackService}
                 workspaceShellPath={workspaceShellPath}
                 workspaceIdentity={workspaceShellIdentity}
                 workspaceRemoteSessionId={workspaceShellRemoteSessionId}

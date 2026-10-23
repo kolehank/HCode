@@ -5,10 +5,21 @@ import {
   resolveOAuthBusinessCredentialValidationRequest,
 } from "#src/oauth/oauthUnauthorizedRequest.js";
 import { createNodeApiClient } from "#src/providers/api/nodeApiClient.js";
-import {
-  createBigModelLoginAuthHeaders,
-  createZaiLoginAuthHeaders,
-} from "#src/coding-plan-subscription/bigmodelCodingPlanSubscriptionProvider.js";
+// BYOK fork P1a：原 bigmodelCodingPlanSubscriptionProvider 的登录态业务头构造，
+// 内联保留（bigmodel/zai 业务接口要求 Authorization 直接传 accessToken，不加 Bearer）。
+function createBigModelLoginAuthHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: token,
+    "Content-Type": "application/json",
+  };
+}
+
+function createZaiLoginAuthHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: token,
+    "Content-Type": "application/json",
+  };
+}
 
 function createFixture(provider = "zai", env: NodeJS.ProcessEnv = { ZCODE_ENV: "production" }) {
   const credentials = new Map([

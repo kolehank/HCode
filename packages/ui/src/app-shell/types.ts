@@ -15,7 +15,8 @@ import type {
   UpdateStatePayload,
   UserInfo,
 } from "@zcode/shared";
-import type { IFeedbackService, IServiceAccessor } from "@zcode/services";
+// BYOK fork P1a：IFeedbackService 随 feedback 模块删除。
+import type { IServiceAccessor } from "@zcode/services";
 import type { SavedWorkflowsOpenTarget } from "@/settings/saved-workflows/SavedWorkflowsSection.js";
 import type { SavedWorkflowHubTarget } from "@/v4/savedWorkflowHubContext.js";
 import type { WebRemoteControlWorkspaceSwitcherApi } from "@/root/types.js";
@@ -150,7 +151,6 @@ export interface RemoteConnectionOpenPreference {
 
 export interface AppProps {
   services: IServiceAccessor;
-  baseFeedbackService: IFeedbackService;
   onConnectRemote: (options: RemoteTarget, requestId?: string) => Promise<string>;
   onSelectRemoteProject: (
     sessionId: string,
@@ -206,7 +206,7 @@ export interface GitChangeSummary {
 
 export type WorkspaceMainView = "chat" | "automations" | "plugin-store";
 
-export interface WorkspaceShellLayoutProps extends Omit<AppProps, "baseFeedbackService"> {
+export interface WorkspaceShellLayoutProps extends AppProps {
   workspaceReadOnlyReason?: string;
   workspaceMainView: WorkspaceMainView;
   pluginStoreOpenVersion: number;

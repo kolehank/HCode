@@ -32,14 +32,9 @@ async function getUsageEntitlementSnapshotOrNull(params: {
   accountAccess?: ZCodeProviderAccountAccess | ZCodeAccountAccess;
 }): Promise<UsageEntitlementSnapshot | null> {
   try {
-    return await params.services.usageStatsService.getEntitlementSnapshot({
-      includeSubscription: true,
-      preferredProviderId: params.providerId,
-      accountAccess: params.accountAccess,
-      allowDisabledPreferredProvider: true,
-      requirePreferredProvider: true,
-      allowEnvApiKey: false,
-    });
+    // BYOK fork P1a：usage-stats 删除，权益快照恒为 null。
+    void params;
+    return null;
   } catch (error) {
     logger.warn("[Root] 刷新登录后权益快照失败", {
       providerId: params.providerId,

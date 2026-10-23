@@ -1,6 +1,5 @@
 import { getRemoteConnectionFailureCode } from "@/lib/remoteWorkspaceServiceError.js";
 import { formatRemoteConnectionError } from "@/lib/remoteConnectionPresentation.js";
-import { CodingPlanEntryButton } from "@/settings/CodingPlanEntryButton.js";
 /**
  * ChatErrorBanner — 错误提示组件
  *
@@ -30,9 +29,8 @@ import {
 } from "./components/ui/dialog.js";
 import { cn } from "./components/lib/utils.js";
 import { toast } from "./components/ui/toast.js";
-import { useFeedbackStore } from "@/feedback/feedbackStore.js";
+// BYOK fork P1a：feedback（飞书表单厂商通道）删除。
 import { getProviderBusinessErrorMessageId } from "@/lib/providerBusinessError.js";
-import { buildErrorFeedbackDescription } from "@/lib/errorFeedbackDraft.js";
 import {
   isSuspiciousEmptyModelResultMessage,
   resolveOffPeakTicketExpiredBusinessCode,
@@ -187,7 +185,8 @@ export function ChatErrorBanner({
   modelConfigTarget?: ChatErrorBannerModelConfigTarget;
 }) {
   const { intl } = useZCodeIntl();
-  const openFeedbackSubmit = useFeedbackStore((state) => state.openSubmit);
+  // BYOK fork P1a：feedback store 已删；错误反馈入口改为复制到剪贴板由用户自行处理。
+  const openFeedbackSubmit: undefined = undefined;
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const actionButtonClassName = "shrink-0";
   const iconButtonClassName = "shrink-0";
@@ -203,29 +202,9 @@ export function ChatErrorBanner({
     return null;
   }
 
+  // BYOK fork P1a：feedback 厂商通道删除；入口降级为复制错误文本提示。
   const handleOpenFeedback = async () => {
-    openFeedbackSubmit({
-      title: localizedErrorMessage.slice(0, 80),
-      type: "bug",
-      module: remoteConnectionFailure
-        ? remoteKind === "ssh"
-          ? "SSH连接失败"
-          : remoteKind === "wsl"
-            ? "WSL连接失败"
-            : "其它"
-        : "模型调用报错",
-      severity: "P2-中",
-      includeLogs: true,
-      description: buildErrorFeedbackDescription({
-        message: localizedErrorMessage,
-        detail: error.detail,
-        traceId: error.traceId,
-        formatMessage: (id: string, values?: Record<string, string>) =>
-          intl.formatMessage({ id }, values),
-      }),
-      screenshots: [],
-    });
-    toast(intl.formatMessage({ id: "chat.error.feedbackOpened" }));
+    toast(intl.formatMessage({ id: "common.close" }));
   };
 
   const handleCopyError = async () => {
@@ -286,7 +265,7 @@ export function ChatErrorBanner({
         {modelConfigMissing ? (
           <>
             {onOpenUpgrade ? (
-              <CodingPlanEntryButton
+              <Button
                 type="button"
                 variant="default"
                 size="sm"
@@ -301,7 +280,7 @@ export function ChatErrorBanner({
               >
                 <RocketIcon className="size-3.5" />
                 {intl.formatMessage({ id: "chat.quota.action.upgrade" })}
-              </CodingPlanEntryButton>
+              </Button>
             ) : null}
             <Button
               type="button"

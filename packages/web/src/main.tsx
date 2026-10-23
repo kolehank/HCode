@@ -38,18 +38,6 @@ import { createWebAuthService } from "./auth/webAuthService.js";
 import { WEB_ZAI_OAUTH_CONFIG, resolveWebAuthDevReturnTo } from "./auth/webZaiOAuthConfig.js";
 import { parseOAuthState, resolveSafeAppReturnTo } from "./auth/oauthStateCodec.js";
 import { resolveWebCommunityUrl, resolveWebHelpConfig } from "./communityUrl.js";
-import {
-  ConversationShareLandingLoader,
-  ConversationShareLandingStatus,
-} from "./share/ConversationShareLandingPage.js";
-import {
-  ConversationSharePreviewClient,
-  resolveConversationShareRouteLocale,
-} from "./share/conversationSharePreviewClient.js";
-import {
-  isConversationSharePath,
-  resolveConversationShareCodeFromPath,
-} from "./share/conversationShareRoute.js";
 import type {
   IPlatformService,
   WebRemoteControlFailure,
@@ -196,7 +184,8 @@ function resolveWebThemePreference(defaultTheme: Theme = WEB_REMOTE_CONTROL_DEFA
 {
   // 分享页没有本地主题配置时使用浅色，已有配置仍然沿用；其他 Web 页面继续默认深色。
   const saved = resolveWebThemePreference(
-    isConversationSharePath(window.location.pathname) ? "zai-light" : undefined,
+    // BYOK fork P1a：分享页路由删除。
+    undefined,
   );
   const resolved =
     saved === "system"
@@ -293,11 +282,8 @@ function renderWebRemoteControlFailure(failure: WebRemoteControlFailure): void {
 
 function isWebOAuthCallback(params: URLSearchParams): boolean {
   return (
-    isWebRemoteControlOAuthCallback(new URL(window.location.href)) ||
-    (["/cn/share/callback", "/share/callback"].includes(window.location.pathname) &&
-      params.has("state") &&
-      // BigModel 的 authCode 要先进入回调页，才能由 provider 归一化为 code。
-      (params.has("code") || params.has("authCode") || params.has("error")))
+    // BYOK fork P1a：/share/callback 路由删除。
+    isWebRemoteControlOAuthCallback(new URL(window.location.href))
   );
 }
 
@@ -320,79 +306,7 @@ function renderWebAuthCallbackPage(): void {
   );
 }
 
-async function renderConversationSharePage(): Promise<void> {
-  // 页面语言跟随路径前缀：/cn/share 中文，裸 /share 英文。
-  const routeLocale = resolveConversationShareRouteLocale(window.location.pathname);
-  // index.html 固定 lang="en"；不同步会让中文分享页对无障碍与浏览器翻译都报错语言。
-  document.documentElement.lang = routeLocale;
-  // 分享页必须设置 title：否则浏览器标签只显示 index.html 的通用标题。
-  // 会话标题要等 preview 加载完，先给一个语言正确的兜底。
-  document.title = routeLocale === "zh-CN" ? "ZCode 会话分享" : "ZCode Conversation Share";
-  const shareCode = resolveConversationShareCodeFromPath(window.location.pathname);
-  if (!shareCode) {
-    root.render(
-      <ConversationShareLandingStatus
-        state={{ kind: "error", error: "invalid_contract" }}
-        locale={routeLocale}
-      />,
-    );
-    return;
-  }
-
-  const endpointOrigin =
-    import.meta.env.VITE_ZCODE_BASE_URL?.trim().replace(/\/+$/u, "") || window.location.origin;
-  const mockMode =
-    import.meta.env.DEV && import.meta.env.VITE_CONVERSATION_SHARE_PREVIEW_MOCK === "true";
-  // Share 加载失败不能只有通用 network 文案：需要区分 mock、endpoint 配置或跨域 fetch。
-  // 这里只记录运行时路由与 endpoint，不记录完整 pathname，避免把 share code 写入日志。
-  console.info("[conversation-share-web]", "preview_runtime_initialized", {
-    browserOrigin: window.location.origin,
-    routeKind: "canonical",
-    endpointOrigin,
-    transport: mockMode ? "mock" : "fetch",
-  });
-  const client = mockMode
-    ? new (
-        await import("./share/mockConversationSharePreviewClient.js")
-      ).MockConversationSharePreviewClient()
-    : new ConversationSharePreviewClient({ baseUrl: `${endpointOrigin}/api/v1` });
-  const getMockToken = () =>
-    mockMode && window.sessionStorage.getItem("zcode:share:mock-auth") === "owner"
-      ? "mock-owner-token"
-      : null;
-  const onLogout = () => {
-    if (mockMode) {
-      window.sessionStorage.removeItem("zcode:share:mock-auth");
-      window.location.reload();
-      return;
-    }
-    void webAuthService.logout();
-  };
-  root.render(
-    <ConversationShareLandingLoader
-      shareCode={shareCode}
-      client={client}
-      getAccessToken={() => getMockToken() ?? webAuthService.getZCodeJwtToken()}
-      onLogin={(provider) => {
-        if (mockMode) {
-          window.sessionStorage.setItem("zcode:share:mock-auth", "owner");
-          window.location.reload();
-          return;
-        }
-        webAuthService.startLogin({
-          provider,
-          appReturnTo: window.location.href,
-          redirectUri: WEB_ZAI_OAUTH_CONFIG.shareRedirectUri,
-          devReturnTo: resolveWebAuthDevReturnTo(WEB_ZAI_OAUTH_CONFIG, "share"),
-        });
-      }}
-      onLogout={onLogout}
-      locale={routeLocale}
-      theme={resolveWebThemePreference("zai-light")}
-    />,
-  );
-}
-
+// BYOK fork P1a：会话分享落地页整体删除。
 function renderWebLoginPage(): void {
   document.title = "ZCode - Web Remote Control Sign In";
   root.render(<WebLoginPage onLogin={(provider) => remoteEntry.startLogin(provider)} />);
@@ -921,10 +835,7 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
         reason: "ZCode session service is not available before workspace bridge is connected.",
       }),
     }),
-    // 分享发布首期只属于 desktop local host；Web 首页和 /remote 不建立独立发布权威。
-    conversationShareService: createUnsupportedHomeOnlyService<
-      RootServices["conversationShareService"]
-    >("conversationShareService"),
+    // BYOK fork P1a：conversationShareService 已随会话分享云功能删除。
     promptAttachmentTransferService: createEmptyHomeOnlyService<
       RootServices["promptAttachmentTransferService"]
     >({
@@ -959,18 +870,7 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
     sourceServerWorkspaceService: createUnsupportedHomeOnlyService<
       RootServices["sourceServerWorkspaceService"]
     >("sourceServerWorkspaceService"),
-    usageStatsService:
-      createUnsupportedHomeOnlyService<RootServices["usageStatsService"]>("usageStatsService"),
-    codingPlanSubscriptionService: createUnsupportedHomeOnlyService<
-      RootServices["codingPlanSubscriptionService"]
-    >("codingPlanSubscriptionService"),
-    clientConfigService: createEmptyHomeOnlyService<RootServices["clientConfigService"]>({
-      getSnapshot: async () => ({
-        pluginStoreOrder: null,
-        zsrcUrl: null,
-        uiPluginRecommendations: [],
-      }),
-    }),
+    // BYOK fork P1a：usageStats / codingPlanSubscription / clientConfigService（厂商云）已删除。
     // 手机 Web 未连接 shared-host attachment 时禁止直连 scenes HTTP；返回空配置保持首页可用。
     clientScenesService: createEmptyHomeOnlyService<RootServices["clientScenesService"]>({
       list: async () => ({ code: 0, msg: "", data: [] }),
@@ -1031,10 +931,7 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
       listStyles: async () => ({ styles: [] }),
       getUserStylesDirectory: async () => ({ path: "" }),
     }),
-    // Bugfix: feedbackService 成为统一服务接口后，Web 远控首页 fallback 也必须补齐。
-    // 断开 bridge 时这里明确报不可用，避免类型通过但运行时误以为空反馈数据。
-    feedbackService:
-      createUnsupportedHomeOnlyService<RootServices["feedbackService"]>("feedbackService"),
+    // BYOK fork P1a：feedbackService（飞书表单）已删除。
     settingsSyncService:
       createUnsupportedHomeOnlyService<RootServices["settingsSyncService"]>("settingsSyncService"),
   };
@@ -2038,10 +1935,7 @@ async function bootstrapWebApp() {
     return;
   }
 
-  if (isConversationSharePath(window.location.pathname)) {
-    await renderConversationSharePage();
-    return;
-  }
+  // BYOK fork P1a：/share 路由不再存在。
 
   if (isWebRemoteControlRoute()) {
     await remoteEntry.start();

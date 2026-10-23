@@ -98,11 +98,10 @@ export function SavedWorkflowsSection({
   // 旁边写当前生效模式。中枢只在生效模式不是关闭时出现，所以这里不处理关闭态。
   // 链接与它要打开的设置行同进同退：行在快照就绪后总是出现，唯一例外是旧 Host 的快照没有
   // offeredMode（readDynamicWorkflowOfferedMode 读不到），行不出，链接也不出——否则点过去是一个找不到的设置。
+  // BYOK fork P1a：动态工作流灰度源删除，config 恒 null，模式行与设置链接不再出现。
   const dynamicWorkflowConfig = useDynamicWorkflowAvailability().config;
-  const dynamicWorkflowMode = dynamicWorkflowConfig?.mode;
-  const showWorkflowSettings =
-    dynamicWorkflowConfig !== null &&
-    readDynamicWorkflowOfferedMode(dynamicWorkflowConfig) !== undefined;
+  const dynamicWorkflowMode = undefined;
+  const showWorkflowSettings = false;
   const handleOpenWorkflowSettings = useCallback(() => {
     setPendingSettingsSectionIntent("general");
     openSettingsTab();

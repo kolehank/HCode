@@ -6,12 +6,22 @@ import type {
   ZCodeOffPeakTaskCreateParams,
   ModelSelection,
 } from "@zcode/shared";
+import type { ModelSelectionView } from "@zcode/provider";
 import { ServiceChannels } from "@zcode/shared";
 import { createServiceDescriptor } from "../descriptors.js";
 
 // 闲时任务管理服务通道（与 automation 服务面互不复用）。
 // renderer 经 ProxyChannel 直连（codingPlanSubscription 同款范式）；
 // 轮询/取号/核销由服务内部驱动，不暴露给 renderer。
+
+// BYOK fork P1a：原 coding-plan-subscription 的灰度配置类型移到此处保留；
+// 厂商配置源已删，Host 不再注入 resolver，UI 侧始终拿到 null。
+export interface OffPeakClientConfig {
+  readonly enabled: boolean;
+  readonly modelSelectionView: ModelSelectionView;
+  /** mock 演示强制通道：真实路径不下发，UI 使用 Host 的 Account support。 */
+  readonly codingPlanActive?: boolean;
+}
 
 export interface OffPeakUpdateTaskParams {
   title?: string;

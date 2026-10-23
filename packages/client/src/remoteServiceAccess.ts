@@ -18,7 +18,6 @@ import {
   ITaskGroupService,
   IRemoteProjectService,
   ICuaPermissionService,
-  IConversationShareService,
   IBotsService,
   IFileWatcherService,
   IOAuthService,
@@ -27,9 +26,6 @@ import {
   IProviderProvisioningTargetService,
   ISourceServerWorkspaceService,
   ISourceServerManagementService,
-  IUsageStatsService,
-  ICodingPlanSubscriptionService,
-  IClientConfigService,
   IClientScenesService,
   ICloudContentService,
   IMarketingTouchService,
@@ -50,7 +46,6 @@ import {
   IMemoryService,
   IOutputStyleService,
   ISettingsSyncService,
-  IFeedbackService,
   IPromptAttachmentTransferService,
   IWindowControllerService,
   IWindowProjectService,
@@ -87,7 +82,6 @@ export class RemoteServiceAccess implements IServiceAccessor {
   // cuaPermissionService 在 IServiceAccessor 上是可选（远端/bots host 不提供），但桌面 renderer
   // 经 RPC 一定能拿到（main host 始终注册此 descriptor；非 macOS / 未启用时方法返回 available:false）。
   readonly cuaPermissionService: ICuaPermissionService;
-  readonly conversationShareService: IConversationShareService;
   readonly botsService: IBotsService;
   readonly fileWatcherService: IFileWatcherService;
   readonly oauthService: IOAuthService;
@@ -98,9 +92,6 @@ export class RemoteServiceAccess implements IServiceAccessor {
   readonly sourceServerWorkspaceService: ISourceServerWorkspaceService;
   /** 仅 desktop base attachment 注册；其他 scope 必须按可选能力消费。 */
   readonly sourceServerManagementService?: ISourceServerManagementService;
-  readonly usageStatsService: IUsageStatsService;
-  readonly codingPlanSubscriptionService: ICodingPlanSubscriptionService;
-  readonly clientConfigService: IClientConfigService;
   readonly clientScenesService: IClientScenesService;
   readonly cloudContentService: ICloudContentService;
   readonly marketingTouchService: IMarketingTouchService;
@@ -122,7 +113,6 @@ export class RemoteServiceAccess implements IServiceAccessor {
   readonly memoryService: IMemoryService;
   readonly outputStyleService: IOutputStyleService;
   readonly settingsSyncService: ISettingsSyncService;
-  readonly feedbackService: IFeedbackService;
   readonly promptAttachmentTransferService: IPromptAttachmentTransferService;
 
   constructor(
@@ -199,10 +189,7 @@ export class RemoteServiceAccess implements IServiceAccessor {
     this.cuaPermissionService = ProxyChannel.toService<ICuaPermissionService>(
       channelClient.getChannel(ICuaPermissionService.channelName),
     );
-    this.conversationShareService = ProxyChannel.toService<IConversationShareService>(
-      channelClient.getChannel(IConversationShareService.channelName),
-    );
-    this.botsService = ProxyChannel.toService<IBotsService>(
+        this.botsService = ProxyChannel.toService<IBotsService>(
       channelClient.getChannel(IBotsService.channelName),
     );
     this.fileWatcherService = ProxyChannel.toService<IFileWatcherService>(
@@ -233,16 +220,7 @@ export class RemoteServiceAccess implements IServiceAccessor {
           channelClient.getChannel(ISourceServerManagementService.channelName),
         )
       : undefined;
-    this.usageStatsService = ProxyChannel.toService<IUsageStatsService>(
-      channelClient.getChannel(IUsageStatsService.channelName),
-    );
-    this.codingPlanSubscriptionService = ProxyChannel.toService<ICodingPlanSubscriptionService>(
-      channelClient.getChannel(ICodingPlanSubscriptionService.channelName),
-    );
-    this.clientConfigService = ProxyChannel.toService<IClientConfigService>(
-      channelClient.getChannel(IClientConfigService.channelName),
-    );
-    this.clientScenesService = ProxyChannel.toService<IClientScenesService>(
+                this.clientScenesService = ProxyChannel.toService<IClientScenesService>(
       channelClient.getChannel(IClientScenesService.channelName),
     );
     this.cloudContentService = ProxyChannel.toService<ICloudContentService>(
@@ -305,10 +283,7 @@ export class RemoteServiceAccess implements IServiceAccessor {
     this.settingsSyncService = ProxyChannel.toService<ISettingsSyncService>(
       channelClient.getChannel(ISettingsSyncService.channelName),
     );
-    this.feedbackService = ProxyChannel.toService<IFeedbackService>(
-      channelClient.getChannel(IFeedbackService.channelName),
-    );
-    this.promptAttachmentTransferService = ProxyChannel.toService<IPromptAttachmentTransferService>(
+        this.promptAttachmentTransferService = ProxyChannel.toService<IPromptAttachmentTransferService>(
       channelClient.getChannel(IPromptAttachmentTransferService.channelName),
     );
   }

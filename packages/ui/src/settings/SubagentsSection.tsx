@@ -1,7 +1,7 @@
 import { useConfigWorkspaceTargets } from "@/workspace-config-catalog/index.js";
 import { SettingsUserScopeProvider } from "@/settings/SettingsMachine.js";
 /* eslint-disable max-lines -- 子智能体管理页集中维护作用域列表、表单和启用状态，避免状态分散 */
-import { useStartPlanRecommendation } from "@/hooks/useStartPlanRecommendation.js";
+// BYOK fork P1a：useStartPlanRecommendation 删除；推荐恒 null。
 import { hasExplicitModelChanged } from "@/lib/startPlanRecommendation.js";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Bot, Check, Plus, Trash2 } from "lucide-react";
@@ -609,7 +609,8 @@ function SubagentModelOverrideControl({
     config: { model?: string; thoughtLevel?: string },
   ) => Promise<void>;
 }) {
-  const recommendStartPlan = useStartPlanRecommendation(modelSelectionView, "subagent");
+  // BYOK fork P1a：Start Plan 推荐恒 null。
+  const recommendStartPlan = async (_selection: unknown): Promise<null> => null;
   const { intl } = useZCodeIntl();
   const [pending, setPending] = useState(false);
   const [config, setConfig] = useState<{
@@ -679,9 +680,14 @@ function SubagentModelOverrideControl({
             setConfig(previousConfig);
             return;
           }
+          const recommended = chosen as { providerId: string; modelId: string; options?: { reasoningLevel?: string } } | null;
+          if (!recommended) {
+            setConfig(previousConfig);
+            return;
+          }
           selectedConfig = {
-            model: toSubagentModelValue(chosen),
-            thoughtLevel: chosen.options?.reasoningLevel,
+            model: toSubagentModelValue(recommended),
+            thoughtLevel: recommended.options?.reasoningLevel,
           };
         }
         await onModelOverrideChange(agent, selectedConfig);
@@ -817,7 +823,8 @@ function SubagentForm({
   workspaceTabs: ConfigWorkspaceTarget[];
   onScopeKeyChange: (scopeKey: string) => void;
 }) {
-  const recommendStartPlan = useStartPlanRecommendation(modelSelectionView, "subagent");
+  // BYOK fork P1a：Start Plan 推荐恒 null。
+  const recommendStartPlan = async (_selection: unknown): Promise<null> => null;
   const { intl } = useZCodeIntl();
   const initialFormStateKey = createSubagentFormInitialStateKey(initial);
   const initialFormState = useMemo(

@@ -11,16 +11,10 @@ export async function getEnterprisePricingProducts(
   domain: ProviderFamilyDomain,
 ): Promise<EnterprisePricingProductsResult> {
   // 两个账号域均须按自身 Family 查询；失败与明确空列表分开，不能据此自动改掉已有连接。
-  try {
-    const pricing = await services.codingPlanSubscriptionService.getEnterprisePricing({
-      authenticated: true,
-      family: domain,
-    });
-    return { status: "success", productList: pricing.productList };
-  } catch (error) {
-    logger.warn("[Root] 刷新登录后团队套餐失败", { domain, error });
-    return { status: "error" };
-  }
+  // BYOK fork P1a：厂商订阅服务删除，团队套餐目录恒不可用。
+  void services;
+  void domain;
+  return { status: "error" };
 }
 
 export async function getEnterprisePricingProductsOrEmpty(

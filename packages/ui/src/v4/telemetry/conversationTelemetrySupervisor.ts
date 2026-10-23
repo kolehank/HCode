@@ -39,10 +39,9 @@ import {
   recordPromptPermissionResponse,
   recordPromptTokenUsageDelta,
 } from "@/lib/messageTelemetry.js";
-import {
-  reportPlanUsageModelRequestStartedToArms,
-  reportPlanUsageTtftToArms,
-} from "@/lib/planUsageArmsTelemetry.js";
+// BYOK fork P1a：plan usage ARMS 遥测已删，占位 no-op。
+const reportPlanUsageModelRequestStartedToArms = (..._args: unknown[]) => {};
+const reportPlanUsageTtftToArms = (..._args: unknown[]) => {};
 import {
   reportSendFunnelInputFocus,
   reportSendFunnelSendClick,

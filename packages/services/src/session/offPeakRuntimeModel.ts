@@ -1,15 +1,13 @@
 /* eslint-disable max-lines -- Off-Peak 凭证解析、支持矩阵与 Request Auth 共用同一组契约，拆散会让双凭证/Team 身份边界更难追踪。 */
 /* Host 派发时按当前票据构造逐请求鉴权材料；Provider/Model 静态事实由 Built-in Config 提供。 */
 import {
-  BUILTIN_MODEL_PROVIDER_IDS,
   resolveOffPeakProviderId,
-  buildRuntimeZCodeApiUrl,
   type OffPeakCodingPlanKind,
   type OffPeakCodingPlanSupport,
   type OffPeakCodingPlanUnsupportedReason,
   type ZCodeAccountAccess,
 } from "@zcode/shared";
-import { isOffPeakMockEnabled, startOffPeakMockGateway } from "./offPeakMockGateway.js";
+// BYOK fork P1a：offPeakMockGateway 已删除（厂商云端点的进程内 mock）。
 import type { ServiceLogger } from "../logger/serviceLogger.js";
 import { AccountRequestCredentialUnavailableError } from "../model-provider/accountProviderRequestAuthService.js";
 import type { IAccountRequestAuthService } from "../model-provider/accountRequestAuthService.js";
@@ -134,23 +132,8 @@ function createOffPeakSelectionFingerprint(
  */
 export async function resolveOffPeakCredentials(
   deps: OffPeakCredentialResolverDeps,
-  options: { allowMockCredentials?: boolean } = {},
 ): Promise<OffPeakCredentialSnapshot> {
   const env = deps.env ?? process.env;
-  if (options.allowMockCredentials !== false && env["ZCODE_OFFPEAK_MOCK"] === "1") {
-    if (env["ZCODE_OFFPEAK_MOCK_NO_PLAN"] === "1") {
-      throw new OffPeakCodingPlanUnavailableError("connection_unavailable");
-    }
-    // mock 网关不校验凭证；使用确定性 metadata 让 UI 和 ticket/runtime 仍共享同一 support 形状。
-    return {
-      jwt: "offpeak-mock-jwt",
-      codingPlanApiKey: "offpeak-mock-key",
-      kind: "bigmodel-personal",
-      providerFamily: "bigmodel",
-      providerId: BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
-    };
-  }
-
   // settings 可能在账号 Provider 解析期间切换。前后指纹不一致时重读一次，禁止拼接两代凭证。
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const provider = await deps.resolveAccountProvider();
@@ -290,69 +273,38 @@ export async function resolveOffPeakCodingPlanSupport(
   }
 }
 
-/**
- * mock 网关的上游解析：把 admitted 的 messages 代理到用户 coding plan 的 anthropic
- * 兼容端点（真模型、走用户自己的 key，仅开发/演示）。
- */
-export async function resolveOffPeakMockUpstream(deps: {
-  credentialService: OffPeakCredentialResolverDeps["credentialService"];
-  accountRequestAuthService: OffPeakCredentialResolverDeps["accountRequestAuthService"];
-  resolveAccountProvider: OffPeakCredentialResolverDeps["resolveAccountProvider"];
-  env?: NodeJS.ProcessEnv;
-}): Promise<{ url: string; headers: Record<string, string> }> {
-  const credentials = await resolveOffPeakCredentials(deps, {
-    // mock 自己的 placeholder 不能拿去代理上游；这里强制解析真实 selected connection。
-    allowMockCredentials: false,
-  });
-  if (!credentials.providerBaseURL) {
-    throw new Error("off-peak mock upstream requires a selected coding plan provider endpoint");
-  }
-  return {
-    url: `${credentials.providerBaseURL.replace(/\/$/, "")}/v1/messages`,
-    headers: {
-      "x-api-key": credentials.codingPlanApiKey,
-      authorization: `Bearer ${credentials.codingPlanApiKey}`,
-    },
-  };
-}
+// BYOK fork P1a：resolveOffPeakMockUpstream（mock 网关上游解析）随 offPeakMockGateway 删除。
 
 /**
- * origin 解析器（memoized）：mock 模式懒启动进程内网关（固定端口，多实例经 EADDRINUSE
- * 复用同一份票据状态），真实模式指向 zcode API origin。node 服务装配与 host 派发两侧
- * 各持一个解析器也安全——谁先绑定谁持有网关，另一方外部复用。
+ * origin 解析器（memoized）。
+ * BYOK fork P1a：厂商 off-peak 服务端不存在，origin 固定指向 `.invalid` 保留字域名，
+ * 使所有票据请求在网络层 fail-closed；调度框架（repo/service/dispatch）保持不变。
  */
 export function createOffPeakOriginResolver(deps: {
   logger: ServiceLogger;
-  resolveUpstream: () => Promise<{ url: string; headers: Record<string, string> }>;
   env?: NodeJS.ProcessEnv;
 }): { resolveOrigin: () => Promise<string>; close: () => Promise<void> } {
   const env = deps.env ?? process.env;
   let originPromise: Promise<string> | null = null;
-  let closeGateway: (() => Promise<void>) | null = null;
   return {
     resolveOrigin: () => {
       if (!originPromise) {
         originPromise = (async () => {
-          if (!isOffPeakMockEnabled(env)) {
-            return new URL(buildRuntimeZCodeApiUrl(env, "/")).origin;
+          if (env["ZCODE_OFFPEAK_MOCK"] === "1") {
+            // 兼容旧 E2E 环境变量：显式要求 mock 时不再有本地网关，直接 fail-closed。
+            deps.logger.warn(
+              undefined,
+              "ZCODE_OFFPEAK_MOCK=1 is no longer supported; off-peak origin stays fail-closed",
+            );
           }
-          const gateway = await startOffPeakMockGateway({
-            logger: deps.logger,
-            resolveUpstream: deps.resolveUpstream,
-          });
-          if (!gateway.external) closeGateway = gateway.close;
-          return gateway.origin;
-        })().catch((error) => {
-          originPromise = null; // 失败后允许重试（如端口短暂占用）
-          throw error;
-        });
+          // `.invalid` 是 RFC 2606 保留字，DNS 永不解析；请求在此终结，不会外发。
+          return "https://off-peak.invalid";
+        })();
       }
       return originPromise;
     },
     close: async () => {
-      const close = closeGateway;
-      closeGateway = null;
-      if (close) await close();
+      originPromise = null;
     },
   };
 }

@@ -50,7 +50,8 @@ import type {
   ProviderSource,
 } from "@zcode/provider";
 import { completeNewModelSelection } from "@zcode/provider";
-import type { OffPeakClientConfig } from "#src/coding-plan-subscription/codingPlanSubscription.js";
+// BYOK fork P1a：OffPeakClientConfig 类型随 coding-plan-subscription 删除移至 session/offPeakTask.js。
+import type { OffPeakClientConfig } from "#src/session/offPeakTask.js";
 import {
   subagentRuntimeConfigSchema,
   zcodeSubagentsReadRuntimeConfigParamsSchema,
@@ -170,7 +171,28 @@ import {
   type ZCodeTaskMode,
 } from "@zcode/shared";
 import { createServiceLogger } from "#src/logger/serviceLogger.js";
-import { createOfficialMcpIssuanceAudit } from "#src/official-mcp/officialMcpIssuanceAudit.js";
+// BYOK fork P1a：official-mcp 模块整体删除（厂商 Server MCP 凭证下发）。
+// 首次发放审计是纯本地内存计数器，内联保留；身份头 resolver 不再注入，
+// 协议 handler 按既有 fail-closed 语义返回 official_auth_unavailable。
+function createOfficialMcpIssuanceAudit(maxEntries = 256): {
+  markFirst(pluginId: string, mcpKey: string, workspaceKey: string): boolean;
+} {
+  const capacity = Math.max(1, Math.trunc(maxEntries));
+  const keys = new Map<string, true>();
+  return {
+    markFirst(pluginId, mcpKey, workspaceKey) {
+      const key = `${pluginId}\u0000${mcpKey}\u0000${workspaceKey}`;
+      if (keys.has(key)) return false;
+      keys.set(key, true);
+      while (keys.size > capacity) {
+        const oldest = keys.keys().next();
+        if (oldest.done) break;
+        keys.delete(oldest.value);
+      }
+      return true;
+    },
+  };
+}
 import type {
   AccountRequestAuthMaterial,
   IAccountRequestAuthService,

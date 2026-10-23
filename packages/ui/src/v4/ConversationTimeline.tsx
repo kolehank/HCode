@@ -47,7 +47,7 @@ import {
 import { ConversationPendingGuideList } from "@/v4/ConversationPendingGuideList.js";
 import type { AssistantFeedbackHandler } from "@/v4/ConversationRowView.js";
 import { ConversationTurnNavigator } from "@/v4/ConversationTurnNavigator.js";
-import { syncConversationShareSelectionPanelLayout } from "@/v4/conversationShareSelectionPanelLayout.js";
+// BYOK fork P1a：分享选择面板布局同步删除。
 import type { ConversationRowRenderContext } from "@/v4/conversationRowContext.js";
 import {
   isSameConversationLatestTurnSummary,
@@ -616,46 +616,6 @@ function ConversationTimelineImpl({
     statusPanelLayout: summaryPanelLayout,
   });
 
-  const syncShareSelectionPanelLayout = useCallback(() => {
-    if (!backgroundScrollLocked) return;
-    const container = selectionPanelLayoutContainerRef?.current;
-    const dock = composerDockRef.current;
-    if (!container || !dock) return;
-
-    // 选择面板是 SessionPane 的兄弟节点，不能把 CSS 变量写在 Timeline
-    // 自身，否则面板拿不到 dock 的真实边界；统一写入共享父容器供两者使用。
-    const layout = syncConversationShareSelectionPanelLayout(container, dock);
-    const previous = shareSelectionPanelLayoutRef.current;
-    if (previous?.centerYPx === layout.centerYPx && previous.maxHeightPx === layout.maxHeightPx) {
-      return;
-    }
-    shareSelectionPanelLayoutRef.current = layout;
-  }, [backgroundScrollLocked, selectionPanelLayoutContainerRef]);
-
-  useLayoutEffect(() => {
-    if (!backgroundScrollLocked) return;
-    const container = selectionPanelLayoutContainerRef?.current;
-    const dock = composerDockRef.current;
-    if (!container || !dock) return;
-
-    syncShareSelectionPanelLayout();
-    let resizeObserver: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(syncShareSelectionPanelLayout);
-      resizeObserver.observe(container);
-      resizeObserver.observe(timelineRootRef.current ?? container);
-      if (scrollRef.current) resizeObserver.observe(scrollRef.current);
-      resizeObserver.observe(dock);
-    }
-
-    // ResizeObserver 在部分 Electron flex 布局中可能晚于窗口尺寸变化回调，
-    // 因此窗口 resize 也始终触发一次几何同步，保证面板随窗口放大/缩小。
-    window.addEventListener("resize", syncShareSelectionPanelLayout);
-    return () => {
-      window.removeEventListener("resize", syncShareSelectionPanelLayout);
-      resizeObserver?.disconnect();
-    };
-  }, [backgroundScrollLocked, selectionPanelLayoutContainerRef, syncShareSelectionPanelLayout]);
 
   const hasBottomDock = Boolean(bottomDock);
   useLayoutEffect(() => {

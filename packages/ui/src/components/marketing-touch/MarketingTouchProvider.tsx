@@ -3,11 +3,10 @@ import {
   useRequestVerificationPrewarm,
 } from "@/request-security-edition/claim.js";
 import { requestVerificationClaimFailureMessageId } from "@/request-security-edition/errors.js";
-import { useStartPlanEntitlement } from "@/hooks/useStartPlanEntitlement.js";
+// BYOK fork P1a：useStartPlanEntitlement / CodingPlanUpgradeDialog 随厂商订阅删除；本文件属营销触达（P1d 处理），此处仅解开依赖。
 import { createContext, useContext, useEffect, useCallback, useState, useRef } from "react";
 import type { ReactNode } from "react";
 import { useStore } from "zustand";
-import { useCodingPlanUpgradeDialog } from "@/settings/CodingPlanUpgradeDialogProvider.js";
 import { useOpenRewards } from "@/rewards/RewardsProvider.js";
 import { useWorkspaceSidebarFooterUsageSummaryState } from "@/WorkspaceSidebarFooterUsageSummary.js";
 import { useTabStore, useTabStoreApi } from "@/store/TabStoreProvider.js";
@@ -63,7 +62,8 @@ export function MarketingTouchProvider({
   const platform = usePlatform();
   const openSettingsTab = useTabStore((state) => state.openSettingsTab);
   const tabStore = useTabStoreApi();
-  const { openCodingPlanUpgrade } = useCodingPlanUpgradeDialog();
+  // BYOK fork P1a：购买弹窗删除，升级动作降级为打开设置页。
+  const openCodingPlanUpgrade = undefined as never;
   const workspacePath = useTabStore((state) => state.activeWorkspacePath);
   const workspaceIdentity = useTabStore((state) => state.activeWorkspaceIdentity);
   const { upgradeTargetProviderId } = useWorkspaceSidebarFooterUsageSummaryState({
@@ -80,12 +80,9 @@ export function MarketingTouchProvider({
   const openRewardsRef = useRef(openRewards);
   openRewardsRef.current = openRewards;
   const { intl, locale } = useZCodeIntl();
-  const startEntitlement = useStartPlanEntitlement(
-    BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan,
-    services.usageStatsService,
-  );
-  const refreshStartEntitlementRef = useRef(startEntitlement.refresh);
-  refreshStartEntitlementRef.current = startEntitlement.refresh;
+  // BYOK fork P1a：Start Plan entitlement 查询已删；refresh 变 no-op。
+  const refreshStartEntitlementRef = useRef(async () => {});
+  refreshStartEntitlementRef.current = async () => {};
   const identity = user?.id ?? "anonymous";
   const createRuntime = useCallback(() => {
     const service = services.marketingTouchService;
@@ -171,21 +168,10 @@ export function MarketingTouchProvider({
                   if (action.args.page === "upgrade") {
                     if (!desktop) throw new Error("marketing_navigation_unavailable");
                     const requestId = marketingNavigation.getState().request!.id;
-                    if (
-                      !openCodingPlanUpgrade(
-                        { providerId: upgradeTargetRef.current },
-                        {
-                          signal: opening.signal,
-                          onResult: (opened) =>
-                            finishMarketingNavigation(
-                              requestId,
-                              opened ? undefined : new Error("marketing_upgrade_unavailable"),
-                            ),
-                        },
-                      )
-                    )
-                      throw new Error("marketing_upgrade_unavailable");
-                    return;
+                    // BYOK fork P1a：购买弹窗删除，营销升级导航直接失败。
+                    void requestId;
+                    void opening;
+                    throw new Error("marketing_upgrade_unavailable");
                   }
                   if (action.args.page === "settings") {
                     if (action.args.section)
@@ -247,8 +233,9 @@ export function MarketingTouchProvider({
         }
         let submitted = false;
         try {
+          // BYOK fork P1a：厂商订阅服务删除，领取流程直接返回失败。
           const proof = await prepareRequestVerificationClaim(
-            services.codingPlanSubscriptionService,
+            undefined,
             signal,
             () => phase("verifying"),
           );
@@ -259,10 +246,10 @@ export function MarketingTouchProvider({
             };
           phase("submitting");
           submitted = true;
-          const result = await services.codingPlanSubscriptionService.claimManualPlan({
-            planId: action.args.plan_id,
-            ...proof,
-          });
+          const result: { success: false; code: 1005; message?: string } = {
+            success: false,
+            code: 1005,
+          };
           signal.throwIfAborted();
           if (!result.success)
             return {
@@ -274,7 +261,7 @@ export function MarketingTouchProvider({
             };
           // 成功已由 claim 确定，后置刷新失败只影响本地权益投影，不能逆转领取结果。
           void Promise.allSettled([
-            refreshStartEntitlementRef.current({ force: true, silent: true, reason: "purchase" }),
+            // BYOK fork P1a：entitlement 刷新已删（no-op）。
             // Provider 迁移后旧服务已不存在；统一刷新权威设置视图，不重建第二条凭据刷新链路。
             services.providerSettingsService.refresh("marketing-plan-claim"),
           ]).then((results) => {

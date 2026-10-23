@@ -1,5 +1,4 @@
-import type { CodingPlanRegularTpsRequest } from "@zcode/shared";
-import type { IUsageStatsService } from "@zcode/services";
+// BYOK fork P1a：IUsageStatsService / CodingPlanRegularTpsRequest 随 usage-stats 删除。
 
 export interface HighspeedTimingMetricsForSavedTime {
   outputTokens: number;
@@ -71,21 +70,12 @@ export function calculateHighspeedSavedDurationFromMetrics(
   });
 }
 
-export async function readHighspeedRegularTpsFromHealth(params: {
-  usageStatsService: IUsageStatsService;
+// BYOK fork P1a：usage-stats 服务删除后，Coding Plan 健康接口的基准 TPS 查询不再可用；
+// 节省时间展示退化为无基准（返回 undefined），加速卡本身不受影响。
+export async function readHighspeedRegularTpsFromHealth(_params: {
   preferredProviderId: string;
-  /**
-   * 当前 Coding Plan 的账号访问上下文。Provider 重构后请求期鉴权只能由它解析，
-   * 缺失时 host 无法确定用哪个账号/团队项目查询，必定抛错。
-   */
-  accountAccess: CodingPlanRegularTpsRequest["accountAccess"];
+  accountAccess: unknown;
   timeZone?: string;
 }): Promise<number | undefined> {
-  const getRegularTps = params.usageStatsService.getCodingPlanRegularTps;
-  if (!getRegularTps) return undefined;
-  return getRegularTps.call(params.usageStatsService, {
-    preferredProviderId: params.preferredProviderId,
-    accountAccess: params.accountAccess,
-    ...(params.timeZone ? { timeZone: params.timeZone } : {}),
-  });
+  return undefined;
 }
