@@ -25,11 +25,14 @@ import {
   type HostPreparedProjectWorkspace,
   type HostProjectWorkspaceNavigationInput,
 } from "@zcode/shared";
-import type {
-  RemoteConnectionStats,
-  RemoteDisconnectReason,
-  RemoteGaugeTransition,
-} from "./desktopRemoteUsageArmsTelemetry.js";
+// BYOK fork P0：desktopRemoteUsageArmsTelemetry 已删除。RemoteConnectionStats 等
+// 遥测计量类型改为本地空壳（仅剩 IPC 形状兼容，不再产出真实统计）。
+export interface RemoteConnectionStats {
+  activeSessionCount: number;
+  activeTargetCount: number;
+}
+type RemoteDisconnectReason = string;
+type RemoteGaugeTransition = string;
 import type { RemoteAssetDirs } from "./desktopRuntimeEnv.js";
 import { ProviderProvisioningEnvironmentCoordinator } from "./providerProvisioningEnvironmentCoordinator.js";
 
@@ -473,27 +476,12 @@ export function createRemoteWorkspaceSessionManager(options: {
       `[window-host-remote] renderer attachment ready, sessionId=${payload.sessionId}, reason=${pending.reason}`,
     );
     if (!route.connectFinalized) {
+      // BYOK fork P0：connected 的 remote-usage ARMS 上报已删除。
       route.connectFinalized = true;
-      if (route.remoteUsageTelemetryEligible) {
-        reportRemoteRouteConnected(route);
-      }
     }
     pending.resolve();
   }
 
-  function reportRemoteRouteConnected(route: RemoteAttachmentRoute): void {
-    try {
-      options.reportRemoteConnectionStateChanged?.({
-        rendererId: route.webContentsId,
-        remoteKind: route.descriptor.target.kind,
-        transition: "connected",
-      });
-    } catch (error) {
-      options.logger.warn("[remote-usage-arms] connected reporter failed", {
-        error,
-      });
-    }
-  }
 
   function handleConnected(
     child: ElectronUtilityProcess,
@@ -545,12 +533,7 @@ export function createRemoteWorkspaceSessionManager(options: {
       // Bug 原因：显式 conversation bind 与 Source 自动恢复可能 join 到同一个 Host
       // logical session。过去这里覆盖 routesBySessionId，旧 candidate 的 ready ACK 会被
       // 判 stale，遗留 timer 最终又回收健康 attachment。重复 connect 只等待唯一 route ready。
-      const promoteTelemetryEligibility =
-        !existingRoute.remoteUsageTelemetryEligible && pending.remoteUsageTelemetryEligible;
-      existingRoute.remoteUsageTelemetryEligible ||= pending.remoteUsageTelemetryEligible;
-      if (promoteTelemetryEligibility && existingRoute.connectFinalized) {
-        reportRemoteRouteConnected(existingRoute);
-      }
+      // BYOK fork P0：遥测资格提升（reportRemoteRouteConnected）已删除。
       void waitForJoinedRouteReady(existingRoute, descriptor).then(
         () => {
           pending.onConnected?.(descriptor);
@@ -762,36 +745,11 @@ export function createRemoteWorkspaceSessionManager(options: {
     mutate: () => void,
   ): void {
     const wasActive =
-      route.remoteUsageTelemetryEligible &&
       route.attachmentState === "attachable" &&
       route.connectFinalized;
     mutate();
     if (!wasActive) return;
-
-    const common = {
-      rendererId: route.webContentsId,
-      remoteKind: route.descriptor.target.kind,
-    };
-    try {
-      options.reportRemoteConnectionStateChanged?.({
-        ...common,
-        transition: reason,
-      });
-    } catch (error) {
-      // telemetry 是连接生命周期的旁路，不能因 reporter 异常回滚 route 退出状态。
-      options.logger.warn("[remote-usage-arms] disconnect gauge reporter failed", { error });
-    }
-    try {
-      options.reportRemoteDisconnect?.({
-        ...common,
-        disconnectReason: reason,
-        durationMs: Math.max(0, Math.round(monotonicNowMs() - route.connectedAtMonotonicMs)),
-      });
-    } catch (error) {
-      options.logger.warn("[remote-usage-arms] disconnect reporter failed", {
-        error,
-      });
-    }
+    // BYOK fork P0：disconnect 的 remote-usage ARMS 上报已删除；route 退出状态由 mutate 维护。
   }
 
   function handleClosed(
@@ -1365,8 +1323,7 @@ export function createRemoteWorkspaceSessionManager(options: {
   function getRemoteConnectionStats(): RemoteConnectionStats {
     const activeRoutes = Array.from(routesBySessionId.values()).filter(
       (route) =>
-        route.remoteUsageTelemetryEligible &&
-        route.attachmentState === "attachable" &&
+          route.attachmentState === "attachable" &&
         route.connectFinalized,
     );
     return {

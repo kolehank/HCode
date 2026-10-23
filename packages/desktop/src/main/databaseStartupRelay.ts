@@ -6,7 +6,6 @@ import {
   databaseStartupControlSchema,
   type DatabaseStartupState,
 } from "@zcode/shared";
-import { reportDatabaseStartupState } from "./databaseStartupTelemetry.js";
 
 let localStorageReady = false;
 let quit: (() => void) | undefined;
@@ -48,11 +47,8 @@ export function bindDatabaseStartupRelay(
     if (latest && state.startupId === latest.startupId && state.sequence <= latest.sequence) return;
     latest = state;
     forward(state);
-    try {
-      reportDatabaseStartupState(state);
-    } catch {
-      /* 遥测故障不阻断启动。 */
-    }
+    // BYOK fork P0：删除 database startup 的 ARMS 上报；本地状态同步链路（renderer 准入、
+    // Host 调度）保留，仅去掉出网遥测一跳。
     if (state.phase === "ready" && !localStorageReady) {
       localStorageReady = true;
       for (const listener of readyListeners) listener();

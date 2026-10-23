@@ -1,5 +1,4 @@
-import { ingestToolExecResource } from "./desktopResourceTelemetry.js";
-import { ingestMcpResourceSamples } from "./processResourceMcpTelemetrySource.js";
+// BYOK fork P0：ARMS 资源遥测 ingest（tool-exec / mcp samples）已删除。
 /* eslint-disable max-lines -- host process 统一处理 main↔host 生命周期、日志、ZCode Agent，拆分前先保持跨进程消息收口。 */
 import {
   type HostAgentProcessErrorResponse,
@@ -8,9 +7,6 @@ import {
   type HostAgentProcessReadyResponse,
   type HostAgentProcessSpawnedResponse,
   type HostCuaOperationStateResponse,
-  type HostMcpTelemetryResponse,
-  type HostSessionCreateTelemetryResponse,
-  type HostPluginTelemetryResponse,
   type RemoteTarget,
   type TaskRealtimeHostDeliveryKind,
   type WorkspacePurpose,
@@ -41,7 +37,6 @@ import { join } from "node:path";
 import { BroadcastHub } from "./broadcastHub.js";
 import { bindDatabaseStartupRelay } from "./databaseStartupRelay.js";
 import { getMainLaunchPartialMarks } from "./desktopLaunchMarks.js";
-import { ingestHostNetworkObservations } from "./desktopNetworkTelemetry.js";
 import {
   buildHostProcessEnv,
   hostModulePath,
@@ -186,9 +181,7 @@ export function spawnHostProcess(
     onAgentProcessException?: (event: HostAgentProcessExceptionResponse) => void;
     onAgentProcessReady?: (event: HostAgentProcessReadyResponse) => void;
     onAgentProcessSpawned?: (event: HostAgentProcessSpawnedResponse) => void;
-    onMcpTelemetry?: (event: HostMcpTelemetryResponse) => void;
-    onPluginTelemetry?: (event: HostPluginTelemetryResponse) => void;
-    onSessionCreateTelemetry?: (event: HostSessionCreateTelemetryResponse) => void;
+    // BYOK fork P0：MCP/插件/会话创建遥测回调已删除。
     onCuaOperationStateChanged?: (
       source: ElectronUtilityProcess,
       event: HostCuaOperationStateResponse,
@@ -312,10 +305,7 @@ export function spawnHostProcess(
       return;
     }
 
-    if (result.data.type === HostResponseTypes.NetworkTelemetryBatch) {
-      ingestHostNetworkObservations(result.data.observations);
-      return;
-    }
+    // BYOK fork P0：NetworkTelemetryBatch（ARMS 网络遥测）消费已删除，消息直接忽略。
     if (result.data.type === HostResponseTypes.NetworkCaptureBatch) {
       ingestHostNetworkCapture(result.data.batch, child.pid ?? 0);
       return;
@@ -341,34 +331,8 @@ export function spawnHostProcess(
       return;
     }
 
-    if (result.data.type === HostResponseTypes.ToolExecResource) {
-      ingestToolExecResource(result.data.sample, result.data.runtimeSurface);
-      return;
-    }
-
-    if (result.data.type === HostResponseTypes.McpResourceSamples) {
-      ingestMcpResourceSamples(
-        result.data.samples,
-        result.data.runtimeSurface,
-        result.data.environmentKey,
-      );
-      return;
-    }
-
-    if (result.data.type === HostResponseTypes.McpTelemetry) {
-      dependencies.onMcpTelemetry?.(result.data);
-      return;
-    }
-
-    if (result.data.type === HostResponseTypes.PluginTelemetry) {
-      dependencies.onPluginTelemetry?.(result.data);
-      return;
-    }
-
-    if (result.data.type === HostResponseTypes.SessionCreateTelemetry) {
-      dependencies.onSessionCreateTelemetry?.(result.data);
-      return;
-    }
+    // BYOK fork P0：ToolExecResource / McpResourceSamples / McpTelemetry /
+    // PluginTelemetry / SessionCreateTelemetry 的遥测消费已删除，消息直接忽略。
 
     if (result.data.type === HostResponseTypes.LocalMediaPreviewPathAuthorizeRequest) {
       const request = result.data;
