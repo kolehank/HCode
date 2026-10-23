@@ -3,7 +3,7 @@ import {
   browserGlobalNoticeStore,
   type GlobalNoticeStore,
 } from "@/global-notice/globalNoticeStore.js";
-import { HighspeedShareNoticeCard } from "@/highspeed/HighspeedShareNoticeCard.js";
+// BYOK fork P1d：HighspeedShareNoticeCard 通知类型段随 highspeed 营销族删除，通知框架本体保留。
 
 const subscribeNoop = () => () => undefined;
 const getNullSnapshot = () => null;
@@ -30,15 +30,7 @@ export function GlobalNoticeSurface({
 
   if (!notice) return null;
 
-  if (notice.type === "highspeed-share" && notice.schemaVersion === 1) {
-    return (
-      <HighspeedShareNoticeCard
-        notice={notice}
-        onDismiss={() => store?.dismiss(notice.noticeId)}
-      />
-    );
-  }
-
+  // BYOK fork P1d：highspeed-share 通知类型渲染段随 highspeed 营销族删除（未知类型由 surface 安全忽略）。
   // 未注册的通知类型由 surface 安全忽略，避免未知 payload 破坏全局侧栏。
   return null;
 }

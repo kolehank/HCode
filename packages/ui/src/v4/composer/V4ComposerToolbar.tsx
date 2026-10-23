@@ -3,7 +3,8 @@
  * V4 composer 工具条。
  *
  * 展示件全部复用旧 chat-input-toolbar 的纯 props 组件（ModelConfigSelect /
- * ChatModeSwitchControl / ThoughtLevelCycleControl / ChatContextUsage），外观与旧
+ * ChatModeSwitchControl / ChatContextUsage），外观与旧
+ * BYOK fork P1d：ThoughtLevelCycleControl 已随 highspeed 营销族删除。
  * ChatInputToolbar 对齐；但状态编排是全新 v4 wiring，不复活旧 ChatInputToolbar 的
  * effect 链 / 旧协议写路径：
  * - 当前模型/档位来自 Composer；已运行会话的用量来自 snapshot.usage.contextWindow
@@ -16,8 +17,7 @@
  * 三件套不能全部门控在 config!==null 上——草稿态会整体不渲染。
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlarmClockIcon } from "lucide-react";
-import { cn } from "@/components/lib/utils.js";
+// BYOK fork P1d：AlarmClockIcon/cn 随 HighspeedCountdown 删除。
 import {
   BUILTIN_MODEL_PROVIDER_IDS,
   getModelProviderFamilySpec,
@@ -41,10 +41,9 @@ import type {
 import { ModelConfigSelect, type ModelSelectGroup } from "@/ModelConfigSelect.js";
 import type { ComposerModelOptions } from "@/chat-input-toolbar/ComposerModelMenu.js";
 import { Button } from "@/components/ui/button.js";
-import { HighspeedModelIndicator } from "@/highspeed/HighspeedModelIndicator.js";
-import { formatHighspeedRemainingTime } from "@/highspeed/highspeedTime.js";
+// BYOK fork P1d：HighspeedModelIndicator/formatHighspeedRemainingTime 随 highspeed 营销族删除。
 import { ChatContextUsage } from "@/chat-input-toolbar/display.js";
-import { ThoughtLevelCycleControl } from "@/chat-input-toolbar/ThoughtLevelCycleControl.js";
+// BYOK fork P1d：ThoughtLevelCycleControl 导入随加速期渲染段删除。
 import {
   getNextThoughtLevelValue,
   getThoughtLevelLabel,
@@ -96,49 +95,7 @@ const MODEL_SELECTION_LOADING_STATE: ModelSelectionState = { status: "loading" }
 /** 稳定空回调（热键 hook 单实例只处理本组件拥有的选项，其余动作占位）。 */
 function noop(): void {}
 
-function HighspeedCountdown({ expiresAt }: { expiresAt: number }) {
-  const { intl, locale } = useZCodeIntl();
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const remainingTime = formatHighspeedRemainingTime(expiresAt, now);
-  const absoluteExpiryLabel = intl.formatMessage(
-    { id: "chat.highspeed.expiresAt" },
-    {
-      time: new Date(expiresAt).toLocaleTimeString(locale, {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    },
-  );
-  const remainingTimeLabel = intl.formatMessage(
-    { id: "chat.highspeed.remainingTime" },
-    { time: remainingTime },
-  );
-
-  // Bug 根因：倒计时原先晚于 Think 折叠，在中等窄窗口继续占用固定 82px；
-  // 窄窗口只收起数值，保留可 hover 的时钟入口。
-  return (
-    <span
-      aria-label={absoluteExpiryLabel}
-      title={remainingTimeLabel}
-      data-highspeed-countdown="true"
-      className="highspeed-inline-countdown inline-flex h-7 w-[82px] shrink-0 items-center justify-center gap-1 rounded-md p-1 text-ui-caption @max-xl/composer:w-7 @max-xl/composer:gap-0 @max-xl/composer:p-0"
-    >
-      <AlarmClockIcon className="size-4 shrink-0" aria-hidden="true" />
-      <span
-        data-highspeed-countdown-value="true"
-        className="relative h-[18px] w-[54px] shrink-0 leading-4 tabular-nums @max-xl/composer:hidden"
-      >
-        <span className="absolute left-0 top-0.5">{remainingTime}</span>
-      </span>
-    </span>
-  );
-}
+// BYOK fork P1d：HighspeedCountdown 组件随 highspeed 营销族删除。
 
 export interface ModelSelectionSource {
   provider: string;
@@ -266,18 +223,7 @@ export interface V4ComposerToolbarProps {
   draftConfig?: Partial<SessionConfigState>;
   usage: SessionUsageState | null;
   disabled: boolean;
-  /** Highspeed 卡生效时固定本轮模型，禁止通过选择器或快捷键切换。 */
-  modelLocked?: boolean;
-  /** 扩散尾段开始后（恢复入场则立即）展示 Highspeed 模型与倒计时。 */
-  highspeedPresented?: boolean;
-  /** 本次入场是否为 draw 新命中的激活动效；恢复入场的模型标识不做翻页。 */
-  highspeedEntranceAnimated?: boolean;
-  /** 模型翻页完成并静置后播放一次扫光。 */
-  highspeedSweepActive?: boolean;
-  /** Highspeed 卡片过期时间；有值时在模型与 Think 之间显示倒计时。 */
-  highspeedExpiresAt?: number;
-  /** draw 响应绑定的模型；只覆盖锁定期的触发器文案。 */
-  highspeedModel?: string;
+  // BYOK fork P1d：highspeed 卡锁定/入场/倒计时/模型 props 随 highspeed 营销族删除（modelLocked 仅其使用）。
   /** 单个 composer 内的配置 picker 排他 owner；只属于 renderer-local presentation。 */
   activeConfigPicker: V4ComposerConfigPicker | null;
   onConfigPickerOpenChange: (picker: V4ComposerConfigPicker, open: boolean) => void;
@@ -317,12 +263,6 @@ function V4ComposerModelControlsImpl({
   draftConfig,
   usage,
   disabled,
-  modelLocked = false,
-  highspeedPresented = false,
-  highspeedEntranceAnimated = false,
-  highspeedSweepActive = false,
-  highspeedExpiresAt,
-  highspeedModel,
   activeConfigPicker,
   onConfigPickerOpenChange,
   onSelectModel,
@@ -348,7 +288,7 @@ function V4ComposerModelControlsImpl({
   // BYOK fork P1a：useCodingPlanEntitlements 装配删除。
   const openSettingsTab = useTabStore((state) => state.openSettingsTab);
   const modelTriggerRef = useRef<HTMLSpanElement | null>(null);
-  const thoughtTriggerRef = useRef<HTMLSpanElement | null>(null);
+  // BYOK fork P1d：thoughtTriggerRef 随加速期 ThoughtLevelCycleControl 删除。
   // Ctrl+M 热键：递增 openRequestKey 请求 ModelConfigSelect 打开菜单（旧 handleOpenModelMenuShortcut 语义）。
   const [modelMenuOpenRequestKey, setModelMenuOpenRequestKey] = useState(0);
   const [recoveryPending, setRecoveryPending] = useState(false);
@@ -361,12 +301,7 @@ function V4ComposerModelControlsImpl({
     },
     [onConfigPickerOpenChange],
   );
-  const handleThoughtPickerOpenChange = useCallback(
-    (open: boolean) => {
-      onConfigPickerOpenChange("thought", open);
-    },
-    [onConfigPickerOpenChange],
-  );
+  // BYOK fork P1d：handleThoughtPickerOpenChange 随加速期 ThoughtLevelCycleControl 删除。
 
   const modelOption = modelSelectionView?.providers.some((provider) => provider.models.length > 0)
     ? ({
@@ -492,7 +427,7 @@ function V4ComposerModelControlsImpl({
   ]);
   const handleModelValueChange = useCallback(
     (value: string, reasoningLevel?: string) => {
-      if (modelLocked) return;
+      // BYOK fork P1d：modelLocked（highspeed 卡锁定）判断随 highspeed 删除。
       const decoded = decodeCustomModelValue(value);
       // 草稿的点击时可见模型可能只存在于 catalog，或已经被最新 draft
       // intent 覆盖，不能让 SessionPane 再从迟到的 prewarm projection 反推。
@@ -557,7 +492,6 @@ function V4ComposerModelControlsImpl({
       effectiveConfig?.provider,
       onRecoverCustomModelSelection,
       onSelectModel,
-      modelLocked,
       modelSelectionView,
       workspaceIdentity,
       workspacePath,
@@ -781,7 +715,7 @@ function V4ComposerModelControlsImpl({
     hasAnyOption: Boolean(modelOption) || Boolean(thoughtOption),
     toolbarDisabled: disabled || recoveryPending || connectionSwitch.pending,
     modelMenuDisabled:
-      disabled || recoveryPending || modelLocked || connectionSwitch.pending || !modelMenuVisible,
+      disabled || recoveryPending || connectionSwitch.pending || !modelMenuVisible,
     modelOption,
     thoughtOption: thoughtOption ?? undefined,
     onOpenModelMenu: handleOpenModelMenuShortcut,
@@ -818,26 +752,17 @@ function V4ComposerModelControlsImpl({
         data-usage-max={usage?.contextWindow?.maxTokens ?? ""}
         className="hidden"
       />
-      {/* Highspeed 卡激活即锁定模型；不能等动效交接完成才隐藏，否则 usage 圈圈会短暂闪现。 */}
-      {!modelLocked ? (
-        <ChatContextUsage
-          taskUsage={taskUsage}
-          selectedProvider={displayProvider}
-          intl={intl}
-          locale={locale}
-          onSendCompressionCommand={onSendCompressionCommand}
-          compressionDisabled={disabled || recoveryPending}
-        />
-      ) : null}
-      {/* 加速轮的模型由本次卡决定，选型菜单此时不可用，所以指示器优先于选型加载态。 */}
-      {highspeedPresented && highspeedModel ? (
-        <HighspeedModelIndicator
-          model={highspeedModel}
-          originalModel={modelTriggerDisplay.fullLabel}
-          sweepActive={highspeedSweepActive}
-          animateEntrance={highspeedEntranceAnimated}
-        />
-      ) : modelSelectionState.status === "error" && modelSelectionReload ? (
+      {/* BYOK fork P1d：Highspeed 卡锁定 usage 隐藏段随 highspeed 删除，usage 常驻展示。 */}
+      <ChatContextUsage
+        taskUsage={taskUsage}
+        selectedProvider={displayProvider}
+        intl={intl}
+        locale={locale}
+        onSendCompressionCommand={onSendCompressionCommand}
+        compressionDisabled={disabled || recoveryPending}
+      />
+      {/* BYOK fork P1d：HighspeedModelIndicator 指示器分支随 highspeed 删除。 */}
+      {modelSelectionState.status === "error" && modelSelectionReload ? (
         <Button
           type="button"
           variant="ghost"
@@ -883,23 +808,20 @@ function V4ComposerModelControlsImpl({
           manageModelsLabel={manageModelsLabel}
           onManageModels={handleOpenModelProviderSettings}
           lockReasonMessage={intl.formatMessage({
-            id: modelLocked
-              ? "chat.highspeed.modelLocked"
-              : "chat.toolbar.modelSwitch.lockedByRunningTask",
+            id: "chat.toolbar.modelSwitch.lockedByRunningTask",
           })}
           isItemLocked={isModelOptionLocked}
           onValueChange={handleModelValueChange}
           disabled={
             disabled ||
             recoveryPending ||
-            modelLocked ||
             (modelSelectionState.status !== "ready" &&
               !(modelSelectionState.status === "loading" && modelSelectionState.catalog))
           }
           tooltipTitle={modelTriggerDisplay.fullLabel}
           shortcutLabel={modelShortcutLabel}
           triggerRef={modelTriggerRef}
-          open={!modelLocked && activeConfigPicker === "model"}
+          open={activeConfigPicker === "model"}
           onOpenChange={handleModelPickerOpenChange}
           openRequestKey={modelMenuOpenRequestKey}
           labelVisibilityClassName="hidden @sm/composer:inline-flex"
@@ -911,27 +833,7 @@ function V4ComposerModelControlsImpl({
           providerSubmenuClassName={providerSubmenuClassName}
         />
       ) : null}
-      {highspeedPresented && highspeedExpiresAt !== undefined ? (
-        <HighspeedCountdown expiresAt={highspeedExpiresAt} />
-      ) : null}
-      {thoughtOption && (modelLocked || highspeedPresented) ? (
-        <ThoughtLevelCycleControl
-          composerCollapsePriority={3}
-          labelVisibilityClassName="inline-flex"
-          indicatorClassName="block"
-          triggerClassName={cn(highspeedPresented && "text-ui-caption")}
-          option={thoughtOption}
-          onValueChange={handleThoughtValueChange}
-          disabled={disabled || recoveryPending}
-          intl={intl}
-          provider={displayProvider}
-          shortcutLabel={thoughtShortcutLabel}
-          triggerRef={thoughtTriggerRef}
-          open={activeConfigPicker === "thought"}
-          onOpenChange={handleThoughtPickerOpenChange}
-          restoreFocusSelector={V4_COMPOSER_INPUT_SELECTOR}
-        />
-      ) : null}
+      {/* BYOK fork P1d：HighspeedCountdown 与加速期 ThoughtLevelCycleControl 渲染段随 highspeed 营销族删除。 */}
     </>
   );
 }

@@ -4,27 +4,13 @@
 @import "shadcn/tailwind.css";
 @import "@xterm/xterm/css/xterm.css";
 @import "katex/dist/katex.min.css";
-@import "./highspeed/highspeed-activation.css";
-@import "./highspeed/highspeed-share.css";
+/* BYOK fork P1d：highspeed 激活/分享样式导入随 highspeed 营销族删除。 */
 @source "../../../node_modules/streamdown/dist/*.js"; /* 感觉这行也是不好使呢*/
 
 @plugin "@tailwindcss/typography";
 @plugin "../lucide-colors.mjs";
 
-/* Hero 可为任意图片/视频/iframe，不能用 App 主题推断关闭图标对比度。 */
-.cloud-content-dialog {
-  --media-close-surface: rgb(0 0 0 / 50%);
-  --media-close-surface-hover: rgb(0 0 0 / 65%);
-  --media-close-foreground: #fff;
-}
-.cloud-content-dialog [data-slot="dialog-close"] {
-  background-color: var(--media-close-surface);
-  color: var(--media-close-foreground);
-  border: 0;
-}
-.cloud-content-dialog [data-slot="dialog-close"]:hover {
-  background-color: var(--media-close-surface-hover);
-}
+/* BYOK fork P1d：cloud-content-dialog 样式块随 cloud-content 营销族删除。 */
 
 /* Bugfix: KaTeX 会同时输出 MathML 辅助层和 HTML 视觉层；缺少 katex CSS 时两层都会显示，
  * 行内公式和块级公式就会看起来“渲染一遍又普通文本一遍”。 */
@@ -935,11 +921,7 @@ html[data-document-hidden] *::after {
     --animated-gradient-text-strong: var(--color-foreground-subtle);
   }
 
-  .highspeed-animated-gradient-text .animated-gradient-text {
-    /* Bug 根因：accelerated turn 只改了工时文案，内部思考和工具仍继承普通扫光色。 */
-    --animated-gradient-text-strong: var(--color-icon-purple);
-    --animated-gradient-text-soft: color-mix(in srgb, var(--color-icon-purple) 22%, transparent);
-  }
+  /* BYOK fork P1d：highspeed 紫色流光样式块随 highspeed 营销族删除。 */
 
   .cua-group-gradient-text {
     display: inline-block;

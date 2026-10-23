@@ -25,14 +25,14 @@ import {
   resolveConversationTurnWorkDurationMs,
   resolveConversationTurnWorkStatus,
 } from "@/v4/conversationTurnWorkSegments.js";
-import { markHighspeedOutputFooterUnits } from "@/highspeed/highspeedOutputFooter.js";
+// BYOK fork P1d：markHighspeedOutputFooterUnits 随 highspeed 营销族删除。
 
 export type { AssistantWorkRow, ConversationTurnFlowItem } from "@/v4/conversationTurnFlowItems.js";
 export type {
   ConversationTurnWorkSegment,
   ConversationTurnWorkStatus,
 } from "@/v4/conversationTurnWorkSegments.js";
-export { resolveNextHighspeedExpiryMs } from "@/highspeed/highspeedConversationRows.js";
+// BYOK fork P1d：resolveNextHighspeedExpiryMs 再导出随 highspeed 营销族删除。
 
 interface DraftTurnRenderUnit {
   key: string;
@@ -439,5 +439,6 @@ export function buildConversationTurnRenderUnits(
   const normalizedUnits = keptUnits.map((unit, index) =>
     normalizeRenderUnitPosition(unit, index, keptUnits.length, options),
   );
-  return markHighspeedOutputFooterUnits(normalizedUnits, options.nowMs ?? Date.now());
+  // BYOK fork P1d：markHighspeedOutputFooterUnits 调用随 highspeed 营销族删除。
+  return normalizedUnits;
 }

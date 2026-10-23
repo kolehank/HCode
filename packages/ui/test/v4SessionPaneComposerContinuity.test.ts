@@ -636,8 +636,8 @@ describe("SessionPane composer continuity", () => {
       await act(async () => {
         await scrollFocus.composerProps?.onSendText("create session");
       });
-      // Highspeed 统一了首发链路：无附件首发也走「空 createSession + sendText」两段式，
-      // 好让抽卡 admission 拿到真实 sessionId，因此首发 message_id 是 sendText 的 commandId
+      // BYOK fork P1d：首发两段式（空 createSession + sendText）链路保留；原注释提及的
+      // Highspeed 抽卡 admission 已删除。首发 message_id 是 sendText 的 commandId
       // （calls[1]），不是空创建的 commandId（calls[0]）。埋点不变量仍成立：accepted 后只报一次。
       const firstSendCalls = conversationMock.sendCommand.mock.calls;
       expect(firstSendCalls).toHaveLength(2);
@@ -672,9 +672,11 @@ describe("SessionPane composer continuity", () => {
       revisionAtDecision: 1,
       status,
     } as never);
+    let dbgResult: unknown = "no-prop";
     await act(async () => {
-      await scrollFocus.composerProps?.onSendText("/goal explain the test");
+      dbgResult = await scrollFocus.composerProps?.onSendText("/goal explain the test");
     });
+    console.log("DBG onSendText result:", JSON.stringify(dbgResult));
     expect(sessionCreateCapture.report).toHaveBeenCalledTimes(status === "accepted" ? 1 : 0);
     if (status === "accepted")
       expect(sessionCreateCapture.report).toHaveBeenCalledWith(

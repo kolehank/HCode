@@ -105,9 +105,7 @@ vi.mock("@/hooks/usePlatform.js", () => ({
 vi.mock("@/settings/CodingPlanUpgradeDialogProvider.js", () => ({
   useCodingPlanUpgradeDialog: () => ({ openCodingPlanUpgrade: fixture.openUpgrade }),
 }));
-vi.mock("@/components/manual-claim-plan/ManualClaimPlanBanner.js", () => ({
-  ManualClaimPlanBanner: () => null,
-}));
+// BYOK fork P1d：ManualClaimPlanBanner mock 随 manual-claim 营销族删除。
 vi.mock("@/WorkspaceSidebarFooter.js", () => ({
   WorkspaceSidebarFooter: () => createElement("footer", {}, "Footer"),
 }));

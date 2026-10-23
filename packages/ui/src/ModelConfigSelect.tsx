@@ -49,10 +49,10 @@ import {
 } from "@/lib/pickerFocus.js";
 import { ComposerTriggerTransition } from "@/chat-input-toolbar/ComposerTriggerTransition.js";
 import { RollingToolbarLabel } from "@/chat-input-toolbar/RollingToolbarLabel.js";
+// BYOK fork P1d：isGlmHighspeedModel 导入随 highspeed 营销族删除。
 import {
   ComposerModelMenu,
   ComposerThoughtIndicator,
-  isGlmHighspeedModel,
   type ComposerModelOptions,
 } from "@/chat-input-toolbar/ComposerModelMenu.js";
 import { ModelInputCapabilityBadge } from "@/components/ModelInputCapabilityBadge.js";
@@ -531,10 +531,7 @@ export const ModelConfigSelect = memo(function ModelConfigSelectComponent({
     return actions;
   }, [composerOptions, footerActions, manageModelsLabel, onManageModels, showManageModelsAction]);
 
-  const highspeed = isGlmHighspeedModel(
-    modelGroups.flatMap((group) => group.items).find((item) => item.value === normalizedValue)
-      ?.name ?? "",
-  );
+  // BYOK fork P1d：GLM Highspeed 模型视觉判定随 highspeed 营销族删除。
   const triggerContents = showSelectionLabel ? (
     <>
       <span
@@ -554,7 +551,7 @@ export const ModelConfigSelect = memo(function ModelConfigSelectComponent({
         data-composer-open-thought
         className="hidden group-data-[composer-model-icon=true]/toolbar:inline-flex"
       >
-        <ComposerThoughtIndicator options={composerOptions!} highspeed={highspeed} />
+        <ComposerThoughtIndicator options={composerOptions!} />
       </span>
     </>
   ) : (
@@ -574,7 +571,7 @@ export const ModelConfigSelect = memo(function ModelConfigSelectComponent({
         />
       </span>
       {composerOptions && hasSelectedModel ? (
-        <ComposerThoughtIndicator options={composerOptions} highspeed={highspeed} />
+        <ComposerThoughtIndicator options={composerOptions} />
       ) : null}
       {triggerBadge}
       {pending ? (

@@ -215,35 +215,6 @@ function renderComposerWithSnapshot(
   );
 }
 
-function renderHighspeedComposer(overrides: Record<string, unknown> = {}): string {
-  return renderToStaticMarkup(
-    createElement(
-      ZCodeIntlProvider,
-      { initialLocale: "zh-CN" },
-      createElement(AnyConversationComposer, {
-        snapshot: makeSnapshot(),
-        sessionId: "session-1",
-        workspacePath: "/workspace",
-        provider: undefined,
-        highspeedCard: {
-          cardId: "hsc-composer",
-          taskId: "session-1",
-          provider: "zai",
-          model: "glm-5.2",
-          issuedAt: 1_000,
-          expiresAt: 60_000,
-        },
-        onSendText: vi.fn(async () => {}),
-        onStop: vi.fn(),
-        onSelectModel: vi.fn(),
-        onSelectThought: vi.fn(),
-        onSwitchMode: vi.fn(),
-        ...overrides,
-      }),
-    ),
-  );
-}
-
 function renderBlockedComposer(): string {
   return renderToStaticMarkup(
     createElement(
@@ -429,49 +400,7 @@ it("离线输入栏优先显示禁发送原因，不让不可用模型控件挤�
   expect(captured.modelControlsProps).toBeNull();
 });
 
-describe("ConversationComposer Highspeed style", () => {
-  it("激活卡传递到期时间并锁定模型", () => {
-    vi.spyOn(Date, "now").mockReturnValue(1_000);
-
-    const html = renderHighspeedComposer();
-
-    expect(html).toContain('data-highspeed-composer="true"');
-    expect(captured.modelControlsProps).toMatchObject({
-      highspeedExpiresAt: 60_000,
-      modelLocked: true,
-    });
-  });
-
-  it("没有激活请求的卡（切回 Task、快照恢复）直接呈现稳定态，不重播激活动效", () => {
-    vi.spyOn(Date, "now").mockReturnValue(1_000);
-
-    const html = renderHighspeedComposer();
-
-    expect(html).toContain('data-highspeed-entrance="restore"');
-    expect(html).toContain('data-phase="stable"');
-    expect(html).not.toContain("highspeed-diffusion-canvas");
-    expect(html).toContain("highspeed-placeholder-presented");
-    expect(captured.modelControlsProps).toMatchObject({
-      highspeedPresented: true,
-      highspeedEntranceAnimated: false,
-      highspeedSweepActive: false,
-    });
-  });
-
-  it("draw 新命中的激活请求从扩散起点播放，模型与倒计时等待交接后再展示", () => {
-    vi.spyOn(Date, "now").mockReturnValue(1_000);
-
-    const html = renderHighspeedComposer({ highspeedActivationCardId: "hsc-composer" });
-
-    expect(html).toContain('data-highspeed-entrance="activation"');
-    expect(html).toContain('data-phase="diffusing"');
-    expect(html).not.toContain("highspeed-placeholder-presented");
-    expect(captured.modelControlsProps).toMatchObject({
-      highspeedPresented: false,
-      highspeedEntranceAnimated: true,
-    });
-  });
-});
+// BYOK fork P1d：ConversationComposer Highspeed style 测试组随 highspeed 营销族删除。
 
 describe("history-first initialization", () => {
   it.each([true, false])("respects the remote gate when available=%s", (remoteAvailable) => {

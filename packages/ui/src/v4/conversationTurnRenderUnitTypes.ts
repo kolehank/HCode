@@ -14,9 +14,9 @@ import type {
   ConversationTurnWorkSegment,
   ConversationTurnWorkStatus,
 } from "@/v4/conversationTurnWorkSegments.js";
-import type { HighspeedOutputFooterMark } from "@/highspeed/highspeedOutputFooter.js";
+// BYOK fork P1d：HighspeedOutputFooterMark 随 highspeed 营销族删除。
 
-export interface ConversationTurnRenderUnit extends HighspeedOutputFooterMark {
+export interface ConversationTurnRenderUnit {
   key: string;
   turnId: string;
   header?: TurnHeaderRow;

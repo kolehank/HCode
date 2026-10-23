@@ -857,10 +857,7 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
     // 闲时任务仅桌面本地（D13）；web home-only 环境按不支持处理。
     offPeakTaskService:
       createUnsupportedHomeOnlyService<RootServices["offPeakTaskService"]>("offPeakTaskService"),
-    highspeedCardService:
-      createUnsupportedHomeOnlyService<RootServices["highspeedCardService"]>(
-        "highspeedCardService",
-      ),
+    // BYOK fork P1d：highspeedCardService stub 随 highspeed 营销族删除。
     skillsService: createEmptyHomeOnlyService<RootServices["skillsService"]>({
       list: async () => ({
         skills: [],

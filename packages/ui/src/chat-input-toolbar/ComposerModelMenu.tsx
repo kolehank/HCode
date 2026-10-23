@@ -28,11 +28,7 @@ const EFFORT_BUBBLES = [
   { top: 7, size: 4, duration: 3.6, delay: -3.1 },
 ];
 
-const HIGHSPEED_BUBBLES = Array.from({ length: 32 }, (_, index) => ({
-  ...EFFORT_BUBBLES[index % EFFORT_BUBBLES.length]!,
-  duration: (8 + (index % 5)) / 10,
-  delay: -index * 0.137,
-}));
+// BYOK fork P1d：HIGHSPEED_BUBBLES 随 highspeed 营销族删除。
 
 export interface ComposerModelOptions {
   providerMenu?: {
@@ -62,17 +58,12 @@ export function getComposerThoughtDisplay(options: ComposerModelOptions) {
   return { label: current?.label ?? "—", progress };
 }
 
-export function isGlmHighspeedModel(name: string) {
-  // GLM FlashX 与 Highspeed 共用视觉；只按显示名称判定，避免误命中其他品牌。
-  return /glm/i.test(name) && /highspeed|flashx/i.test(name);
-}
+// BYOK fork P1d：isGlmHighspeedModel 随 highspeed 营销族删除。
 
 export function ComposerThoughtIndicator({
   options,
-  highspeed = false,
 }: {
   options: ComposerModelOptions;
-  highspeed?: boolean;
 }) {
   const { label, progress } = getComposerThoughtDisplay(options);
   return (
@@ -86,7 +77,7 @@ export function ComposerThoughtIndicator({
       <span
         aria-hidden="true"
         data-testid="composer-thought-meter"
-        data-highspeed={highspeed}
+        // BYOK fork P1d：data-highspeed 属性随 highspeed 营销族删除。
         data-progress={progress}
         className="relative hidden h-4 w-1 shrink-0 overflow-hidden rounded-full bg-foreground/10 group-data-[composer-compact=true]/combined:block"
       >
@@ -130,9 +121,7 @@ export function ComposerModelMenu({
       : undefined) ??
     selected ??
     menuGroups[0];
-  // 视觉只由选中模型名称派生，避免供应商名或内部 value 含 highspeed 时误触发。
-  const modelName = selected?.items.find((item) => item.value === normalizedValue)?.name ?? "";
-  const highspeed = isGlmHighspeedModel(modelName);
+  // BYOK fork P1d：GLM Highspeed 模型视觉判定随 highspeed 营销族删除。
   const currentGroupSelected = group?.key === selected?.key && Boolean(selected);
   const currentIndex = options.levels.findIndex((level) => level.value === options.value);
   const { label } = getComposerThoughtDisplay(options);
@@ -247,7 +236,7 @@ export function ComposerModelMenu({
                       <div
                         className="composer-thought-slider-fill absolute inset-y-0 left-0 overflow-hidden rounded-full"
                         data-max={sliderFilled && currentIndex === options.levels.length - 1}
-                        data-highspeed={highspeed && currentGroupSelected}
+                        // BYOK fork P1d：data-highspeed 属性随 highspeed 营销族删除。
                         style={{
                           width: sliderFilled
                             ? `calc(14px + (100% - 28px) * ${sliderProgress / 100})`
@@ -261,7 +250,8 @@ export function ComposerModelMenu({
                             data-testid="composer-thought-bubbles"
                             className="composer-thought-bubbles absolute inset-0"
                           >
-                            {(highspeed ? HIGHSPEED_BUBBLES : EFFORT_BUBBLES).map(
+                            {/* BYOK fork P1d：Highspeed 气泡分支随 highspeed 营销族删除。 */}
+                            {EFFORT_BUBBLES.map(
                               (bubble, index) => (
                                 <span
                                   key={index}
