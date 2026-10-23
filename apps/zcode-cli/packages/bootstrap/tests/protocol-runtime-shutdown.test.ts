@@ -7,7 +7,7 @@ import type { Logger } from "@zcode/contracts";
 import { createInMemorySessionEventStore } from "@zcode/adapters/storage";
 import { ZCodeProtocolAgentServer } from "../src/zcode-protocol/server.js";
 
-// BYOK fork P0：@zcode/telemetry 已删除，其 shutdown step 与 mock 随之移除。
+// BYOK fork P0：OTLP telemetry 包已删除，其 shutdown step 与 mock 随之移除。
 
 afterEach(() => {
   vi.useRealTimers();

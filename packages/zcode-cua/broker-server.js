@@ -133,6 +133,7 @@ export {
   prepareHelperInstallLockFile,
   writeInstallMeta,
   LOCAL_DEV_RUNTIME_PAYLOAD_PATHS,
+  standaloneHelperCandidatePaths,
 };
 
 // Display name constant lives in the Helper build's helperConstants.

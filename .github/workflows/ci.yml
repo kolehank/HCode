@@ -1,0 +1,43 @@
+# BYOK fork 轻量 CI：push / PR 触发 lint + typecheck + fork:guard。
+# 全量测试与三平台打包在 build.yml（手动 / v* 标签）。
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "24.14.0"
+  PNPM_VERSION: "10.33.2"
+
+jobs:
+  gate:
+    name: lint / typecheck / fork-guard
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        run: npm install -g pnpm@${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: fork:guard（出网/遥测门禁，0 违规才通过）
+        run: pnpm fork:guard
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint

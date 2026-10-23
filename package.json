@@ -33,7 +33,7 @@
     "test:unit": "vitest run --exclude \"packages/desktop/test/e2e/**/*.test.ts\"",
     "test:unit:affected": "node scripts/run-affected-unit-tests.mjs",
     "test:docker:web-app-gateway": "node scripts/test-web-app-gateway-reset.mjs",
-    "verify:pre-push": "pnpm run lint && pnpm run db:schema:check && pnpm run test:architecture && pnpm run architecture:check -- --changed && pnpm run test:unit:affected --scope push",
+    "verify:pre-push": "pnpm run lint && pnpm run db:schema:check && pnpm run test:architecture && pnpm run architecture:check -- --changed && pnpm run test:unit:affected --scope push && pnpm fork:guard",
     "build": "pnpm -r build",
     "build:desktop-agent:bytecode": "node scripts/build-desktop-agent-bytecode.mjs",
     "build:docs": "pnpm --filter @zcode/dev-docs build",
@@ -73,7 +73,8 @@
     "test:architecture": "node --test scripts/test/architecture-governance.test.mjs scripts/test/architecture-governance-review.test.mjs scripts/test/architecture-upstream-admission.test.mjs scripts/test/source-size-policy.test.mjs",
     "architecture:adopt": "node scripts/architecture/architecture-check.mjs adopt",
     "db:schema:check": "node --test scripts/test/sqlite-schema-contract.test.mjs && pnpm --dir apps/zcode-cli exec tsx ../../scripts/check-sqlite-schema.ts",
-    "db:schema:update": "pnpm --dir apps/zcode-cli exec tsx ../../scripts/check-sqlite-schema.ts --update"
+    "db:schema:update": "pnpm --dir apps/zcode-cli exec tsx ../../scripts/check-sqlite-schema.ts --update",
+    "fork:guard": "node scripts/fork-guard.mjs"
   },
   "dependencies": {
     "border-beam": "^1.0.1",
@@ -121,7 +122,6 @@
       "@radix-ui/react-collapsible@1.1.12": "patches/@radix-ui__react-collapsible@1.1.12.patch",
       "vitest@4.1.7": "patches/vitest@4.1.7.patch",
       "wdio-electron-service@9.2.1": "patches/wdio-electron-service@9.2.1.patch",
-      "@arms/rum-electron@0.0.3": "patches/@arms__rum-electron@0.0.3.patch",
       "@ai-sdk/openai-compatible@2.0.60": "patches/@ai-sdk__openai-compatible@2.0.60.patch",
       "@ai-sdk/anthropic@3.0.81": "patches/@ai-sdk__anthropic@3.0.81.patch"
     }

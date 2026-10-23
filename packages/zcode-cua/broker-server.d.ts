@@ -248,3 +248,8 @@ export declare function requestHelperScreenRecordingPermissionViaLaunchServices(
 ): Promise<HelperPermissionRequestResult>;
 
 export type { CuaPermissionRestartOptions, CuaPermissionRestartResult };
+// BYOK fork R5：0.6.5 消费面（cuaStandaloneStatusLaunch）需要的 standalone 启动声明
+// （实现在 vendor runtime 与本模块 162 行，旧 0.6.3 d.ts 未声明）。
+export declare function resolveCuaHelperInstallRoot(env?: NodeJS.ProcessEnv): string | null;
+export declare function resolveHelperAppName(env?: NodeJS.ProcessEnv): string;
+export declare function standaloneHelperCandidatePaths(env?: NodeJS.ProcessEnv): string[];

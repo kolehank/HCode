@@ -8,8 +8,6 @@ export type ArmsRumEnv = "local" | "prod";
 // 非构建环境（如 e2e 测试的 mocha）下 define 不存在，用 typeof 检查 + fallback 避免 ReferenceError
 declare const __ZCODE_ENV__: string;
 declare const __ZCODE_PRODUCT_FLAVOR__: string;
-declare const __ZCODE_ARMS_RUM_ENDPOINT__: string;
-declare const __ZCODE_TELEMETRY_REPORT_ENDPOINT__: string;
 declare const __ZCODE_AUTO_UPDATE_ENABLED__: boolean;
 
 export function normalizeZCodeEnv(value: string | undefined): ZCodeEnv {
@@ -49,14 +47,7 @@ export const RUNTIME_ZCODE_DEBUG =
   typeof process !== "undefined" ? process.env.ZCODE_DEBUG : undefined;
 
 // ── 构建期可选能力（见 docs/desktop/build-time-optional-capabilities.md），未注入时一律关闭 ──
-/** ARMS RUM 上报地址；为空时 SDK 以 enable=false 初始化，不产生上报。 */
-export const ZCODE_ARMS_RUM_ENDPOINT: string =
-  typeof __ZCODE_ARMS_RUM_ENDPOINT__ !== "undefined" ? __ZCODE_ARMS_RUM_ENDPOINT__ : "";
-/** 事件上报（数仓）地址；为空时不上报。 */
-export const ZCODE_TELEMETRY_REPORT_ENDPOINT: string =
-  typeof __ZCODE_TELEMETRY_REPORT_ENDPOINT__ !== "undefined"
-    ? __ZCODE_TELEMETRY_REPORT_ENDPOINT__
-    : "";
+// BYOK fork P0：ARMS RUM / 事件上报（数仓）端点常量已删除——遥测出网收口不存在。
 /** 桌面自动更新是否启用。 */
 export const ZCODE_AUTO_UPDATE_ENABLED: boolean =
   typeof __ZCODE_AUTO_UPDATE_ENABLED__ !== "undefined" ? __ZCODE_AUTO_UPDATE_ENABLED__ : false;

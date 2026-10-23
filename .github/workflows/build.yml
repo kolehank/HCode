@@ -9,7 +9,7 @@
 #   - CLI SEA 单文件二进制：zcode-<platform>-<arch>（单 runner 交叉产出全部 6 个目标）
 #
 # 与 kolehank/ZCode 参考版差异（按本仓库实际情况适配）：
-#   - 无 fork:guard / CUA check:integrity 脚本，门禁只保留 lint / typecheck / 单测
+#   - gate 含 fork:guard（出网/遥测门禁，0 违规才通过）
 #   - 无 ZCODE_SKIP_REMOTE_ASSETS 环境变量；desktop 打包链路不构建 remote assets
 #   - native-search 依赖走仓库内置归档（apps/zcode-cli/dependencies/native-search），
 #     未配置内网源时 prepare 脚本自动回退 repository 来源
@@ -69,6 +69,9 @@ jobs:
 
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
+
+      - name: fork:guard（出网/遥测门禁）
+        run: pnpm fork:guard
 
       - name: Lint
         run: pnpm lint

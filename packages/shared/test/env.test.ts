@@ -14,7 +14,6 @@ describe("shared runtime env", () => {
     const env = await importFreshEnvModule();
 
     // 单测不注入 ARMS 与自动更新。
-    expect(env.ZCODE_ARMS_RUM_ENDPOINT).toBe("");
     expect(env.ZCODE_AUTO_UPDATE_ENABLED).toBe(false);
   });
 

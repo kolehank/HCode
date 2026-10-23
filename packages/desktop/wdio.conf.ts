@@ -116,13 +116,6 @@ import {
   type E2ENetworkCaptureProxy,
 } from "./test/e2e/helpers/network-capture-proxy.js";
 import {
-  resetCodingPlanUpgradeMockServer,
-  resolveCodingPlanUpgradeMockScenario,
-  shouldPrepareCodingPlanUpgradeMockForBuild,
-  startCodingPlanUpgradeMockServer,
-  type CodingPlanUpgradeMockServer,
-} from "./test/e2e/helpers/coding-plan-upgrade-mock-server.js";
-import {
   MANUAL_REVIEW_SPEC_GLOB,
   hasRequiredSshE2EEnvironment,
   resolveEnvironmentGatedFormalSpecExcludes,
@@ -610,7 +603,7 @@ let upstreamReplayServer: UpstreamReplayServer | null = null;
 let codingPlanTeamMockServer: Server | null = null;
 let codingPlanTeamMockBaseUrl = "";
 let codingPlanDataPlaneProxy: E2ENetworkCaptureProxy | null = null;
-let codingPlanUpgradeMockServer: CodingPlanUpgradeMockServer | null = null;
+let codingPlanUpgradeMockServer: { baseUrl: string; stop(): Promise<void> } | null = null;
 let modelContextBudgetConfigMockServer: ModelContextBudgetConfigMockServer | null = null;
 let dynamicWorkflowConfigMockServer: DynamicWorkflowConfigMockServer | null = null;
 let clientScenesMockServer: ClientScenesMockServer | null = null;
@@ -2427,38 +2420,10 @@ async function stopUpstreamE2EHttp() {
 }
 
 async function startCodingPlanUpgradeE2EMock(
-  specs: string[] = [],
-  options: { prepareForBuild?: boolean } = {},
-) {
-  const resolvedScenario = resolveCodingPlanUpgradeMockScenario(specs);
-  const scenario =
-    resolvedScenario ??
-    (options.prepareForBuild && shouldPrepareCodingPlanUpgradeMockForBuild(specs)
-      ? "webview-refresh-provider"
-      : null);
-  if (!scenario) {
-    await stopCodingPlanUpgradeE2EMock();
-    return;
-  }
-  const preparedBaseUrl = process.env[CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV]?.trim();
-  const mockOptions = { marketingTouch: specs.some((spec) => spec.includes("marketing-touch-")) };
-  if (!codingPlanUpgradeMockServer && preparedBaseUrl) {
-    await resetCodingPlanUpgradeMockServer(preparedBaseUrl, scenario, mockOptions);
-    applyCodingPlanUpgradeMockEnv(process.env, preparedBaseUrl);
-    return;
-  }
-  if (codingPlanUpgradeMockServer) {
-    await resetCodingPlanUpgradeMockServer(
-      codingPlanUpgradeMockServer.baseUrl,
-      scenario,
-      mockOptions,
-    );
-    applyCodingPlanUpgradeMockEnv(process.env, codingPlanUpgradeMockServer.baseUrl);
-    return;
-  }
-  codingPlanUpgradeMockServer = await startCodingPlanUpgradeMockServer(scenario, mockOptions);
-  process.env[CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV] = codingPlanUpgradeMockServer.baseUrl;
-  applyCodingPlanUpgradeMockEnv(process.env, codingPlanUpgradeMockServer.baseUrl);
+  _specs: string[] = [],
+  _options: { prepareForBuild?: boolean } = {},
+): Promise<void> {
+  // BYOK fork：coding-plan 升级 mock 已删除（厂商云功能退役），恒 no-op。
 }
 
 // 闲时任务 E2E：off-peak spec 命中时开进程内 mock 网关（ZCODE_OFFPEAK_MOCK=1），
@@ -3490,7 +3455,7 @@ function seedE2EStartupState(specs: string[] = []) {
                 ? createExpiredJwtOAuthCredentialSeed(authProviderId)
                 : createE2EStartupCredentialSeed({
                     specs,
-                    accountMock: codingPlanTeamSpec || codingPlanUpgradeE2E,
+                    accountMock: codingPlanTeamSpec,
                     remoteProfile: process.env.ZCODE_E2E_REMOTE_PROFILE === "1",
                     legacyAuthToken: E2E_AUTH_TOKEN,
                     restoredOAuthCredentials: {
@@ -3610,7 +3575,6 @@ function createExpiredJwtOAuthCredentialSeed(authProviderId: string): Record<str
 }
 
 function isCodingPlanUpgradeE2E(specs: string[] = []) {
-  return resolveCodingPlanUpgradeMockScenario(specs) !== null;
 }
 
 function shouldSeedGuideInteractionBehavior(specs: string[] = []) {
