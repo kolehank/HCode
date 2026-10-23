@@ -374,9 +374,7 @@ contextBridge.exposeInMainWorld("zcode", {
     ipcRenderer.invoke(PlatformChannels.ActivateOrSetWorkspace, path),
   /** 同步当前窗口所有 tab 的 workspace 路径到 main 进程 */
   syncWindowTabs: (paths: string[]) => ipcRenderer.send(PlatformChannels.SyncWindowTabs, paths),
-  /** 同步当前窗口里 Web 远程控制允许切换的 workspace */
-  syncWebRemoteControlWorkspaces: (workspaces: WebRemoteControlWorkspaceTarget[]) =>
-    ipcRenderer.send(PlatformChannels.SyncWebRemoteControlWorkspaces, workspaces),
+  // BYOK fork P3：syncWebRemoteControlWorkspaces（官方中继）已删除。
   onWebRemoteControlReconnectWorkspace: (
     callback: (
       request: WebRemoteControlReconnectWorkspaceRequest,

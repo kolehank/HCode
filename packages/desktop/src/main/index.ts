@@ -74,14 +74,13 @@ import {
   TEST_ZCODE_ENDPOINT_ORIGIN,
   ZCODE_VERSION,
   buildZCodeEndpointUrls,
-  resolveWebRemoteControlRelayWsUrl,
   resolveZCodeEndpointOrigin,
   shouldEnableE2ETestBridge,
   type UpdateStatePayload,
   HostMessageTypes,
   InternalChannels,
 } from "@zcode/shared";
-import { logger, webRemoteControlRelayLogger } from "./logger.js";
+import { logger } from "./logger.js";
 import { markMainLaunchAppReady } from "./desktopLaunchMarks.js";
 import { createCuaPipFocusRouter, resolveCuaPipWindowKey } from "./cuaPipFocusRouter.js";
 import {
@@ -115,11 +114,6 @@ import {
   type ExplicitStartupWorkspaceRequest,
   resolveExplicitStartupWorkspaceBootstrap,
 } from "./startupWorkspaceDeepLinkGate.js";
-import { createWebRemoteControlManager } from "./webRemoteControlManager.js";
-import { createWebRemoteControlDeviceStorage } from "#src/main/web-remote-relay/index.js";
-import { createWebRemoteControlFeatureGate } from "./webRemoteControlFeatureGate.js";
-import { reconnectWebRemoteControlWorkspaceInRenderer } from "./webRemoteControlRendererReconnect.js";
-import { sendWebRemoteControlStatusChangedToWindow } from "./webRemoteControlStatusEvents.js";
 import { executeDesktopCommand } from "./desktopCommandHandlers.js";
 import { clampDesktopZoomLevel, resolveDesktopZoomLevelFromFactor } from "./desktopZoom.js";
 import {
@@ -200,7 +194,6 @@ import {
   listRegisteredHostAgentProcessIds,
   setBrowserUseGuestWebContentsIdsProvider,
 } from "./resourceManagerWindow.js";
-import { createWebRemoteControlSharedHostAttachments } from "./webRemoteControlSharedHostAttachments.js";
 import { registerPlatformIpcHandlers } from "./desktopMainIpcPlatform.js";
 import {
   loadCliMcpFromUserDirectory,
@@ -653,9 +646,8 @@ const disposingHostProcessTimers = new WeakMap<
   ElectronUtilityProcess,
   ReturnType<typeof setTimeout>
 >();
-const webRemoteControlManagerRef = {
-  current: null as ReturnType<typeof createWebRemoteControlManager> | null,
-};
+// BYOK fork P3：官方跨网中继（webRemoteControlManager 与 relay 装配）已删除；
+// 手机远控改走 server/A2 的 tailscale/cloudflared 自建路径。
 let updateStatusWindow: BrowserWindow | null = null;
 const UPDATE_STATUS_WINDOW_WIDTH = 512;
 const UPDATE_STATUS_WINDOW_COMPACT_HEIGHT = 205;
@@ -663,7 +655,6 @@ const UPDATE_STATUS_WINDOW_PROGRESS_HEIGHT = 224;
 const UPDATE_STATUS_WINDOW_READY_HEIGHT = UPDATE_STATUS_WINDOW_PROGRESS_HEIGHT - 54;
 const UPDATE_STATUS_WINDOW_TRAFFIC_LIGHT_POSITION = { x: 10, y: 10 } as const;
 const mainSettingService = createSettingService();
-const webRemoteControlCredentialService = createCredentialService();
 const appLaunchGate = createAppLaunchGate();
 const appLaunchCoordinator = createAppLaunchCoordinator(appLaunchGate);
 // BYOK fork P0：appTelemetryCredentialService 仅服务 telemetryCore 的账号 loader，随遥测删除。
@@ -674,6 +665,7 @@ async function resolveCurrentZCodeEndpointOrigin() {
     overrideOrigin: (await mainSettingService.get()).zcodeEndpointOrigin,
   });
 }
+
 // BYOK fork P1a：context-prompt 灰度依赖厂商 /api/v1/client/configs，已随云功能退役。
 // rolloutes 恒为 disabled：Host 侧两个入口保留调用形状、恒返回 false，rebase 友好。
 function resolveDesktopContextPromptEnabledForHost(): boolean {
@@ -682,61 +674,27 @@ function resolveDesktopContextPromptEnabledForHost(): boolean {
 function awaitFirstHostSpawnDecision(): Promise<void> {
   return Promise.resolve();
 }
-// BYOK fork P0：appTelemetryCore/appTelemetryRuntime 与远程使用遥测上报已删除；
-// 窗口 focus 路由（cuaPipFocusRouter）保留原语义。
-app.on("browser-window-focus", (_event, win) => {
-  rebuildMenu();
-  // 设置/更新等无 Host 的 ZCode 窗口也算前台：router 会先把旧 workspace Host 清成 null，
-  // 再把无 Host 的新窗口事实静默丢弃，避免旧会话 PiP 继续显示。
-  cuaPipFocusRouter.focusWindow(resolveCuaPipWindowKey(win));
-});
-app.on("browser-window-blur", (_event, win) => {
-  cuaPipFocusRouter.blurWindow(resolveCuaPipWindowKey(win));
-});
-app.on("browser-window-created", (_event, win) => {
-  const windowKey = resolveCuaPipWindowKey(win);
-  win.once("closed", () => cuaPipFocusRouter.removeWindow(windowKey));
-});
-
 const remoteSessionManager = createRemoteWorkspaceSessionManager({
   logger,
   windowHostProcessMap,
   resolveRemoteAssetDirs: () =>
     resolveRemoteAssetDirs({ locale: currentApplicationLocale }, hostProcessLocalEnv),
   resolveWslTarget: resolveCanonicalWslTarget,
-  // BYOK fork P0：remote-usage ARMS 上报回调已删除（可选参数，直接省略）。
-  webRemoteControlManagerRef,
+  // BYOK fork P0：remote-usage ARMS 上报回调已删除；P3：中继 managerRef 已删除。
 });
-
-const webRemoteControlSharedHostAttachments = createWebRemoteControlSharedHostAttachments({
-  windowHostProcessMap,
-  attachRemoteWorkspaceSessionHost: remoteSessionManager.attachRemoteWorkspaceSessionHost,
-  logger,
-});
-// BYOK fork P0：deviceMid（厂商设备标识）与 ARMS user identity 同步已删除；
-// 帮助配置与 client-configs 灰度拉取（/api/v1/client/configs）属厂商云功能，P1a 一并删除。
-const webRemoteControlAppVersion = ZCODE_VERSION || app.getVersion();
-const defaultZCodeEndpointUrls = buildZCodeEndpointUrls(DEFAULT_ZCODE_ENDPOINT_ORIGIN, {
-  appVersion: webRemoteControlAppVersion,
-});
-const webRemoteControlRelayWsEnvOverride =
-  process.env["ZCODE_WEB_REMOTE_CONTROL_RELAY_WS_URL"]?.trim();
-const webRemoteControlUrlEnvOverride = process.env["ZCODE_WEB_REMOTE_CONTROL_URL"]?.trim();
-
-function extractOpenWorkspacePathFromDeepLinkUrl(url: string): string | null {
-  try {
-    const parsedUrl = new URL(url);
-    return isWorkspaceOpenUrl(parsedUrl) ? extractWorkspaceOpenPath(parsedUrl) : null;
-  } catch {
-    return null;
-  }
-}
 
 const startupOpenWorkspaceArgPath = extractOpenWorkspacePathFromArgs(process.argv);
 const startupProtocolUrl = extractDeepLinkUrlFromArgs(process.argv);
 const startupDeepLinkWorkspacePath = startupOpenWorkspaceArgPath
   ? null
-  : extractOpenWorkspacePathFromDeepLinkUrl(startupProtocolUrl ?? "");
+  : // deep-link URL 解析失败按无 workspace 链接处理
+    (() => {
+      try {
+        return extractWorkspaceOpenPath(new URL(startupProtocolUrl ?? ""));
+      } catch {
+        return null;
+      }
+    })();
 const startupDeepLinkConsumptionGate = createStartupDeepLinkConsumptionGate(startupProtocolUrl);
 let startupOpenWorkspaceRequest: ExplicitStartupWorkspaceRequest | null =
   startupOpenWorkspaceArgPath
@@ -745,103 +703,6 @@ let startupOpenWorkspaceRequest: ExplicitStartupWorkspaceRequest | null =
       ? { path: startupDeepLinkWorkspacePath, source: "deep-link" }
       : null;
 
-const webRemoteControlManager = createWebRemoteControlManager({
-  getEndpointUrls: async () => {
-    const derived = buildZCodeEndpointUrls(await resolveCurrentZCodeEndpointOrigin(), {
-      appVersion: webRemoteControlAppVersion,
-    });
-    return {
-      ...derived,
-      relayWsUrl: resolveWebRemoteControlRelayWsUrl({
-        endpointOrigin: derived.origin,
-        overrideUrl: webRemoteControlRelayWsEnvOverride,
-      }),
-      remoteUrl: webRemoteControlUrlEnvOverride || derived.remoteUrl,
-    };
-  },
-  relayWsUrl: resolveWebRemoteControlRelayWsUrl({
-    endpointOrigin: DEFAULT_ZCODE_ENDPOINT_ORIGIN,
-    overrideUrl: webRemoteControlRelayWsEnvOverride,
-  }),
-  mobileRemoteControlUrl: webRemoteControlUrlEnvOverride || defaultZCodeEndpointUrls.remoteUrl,
-  // BYOK fork P0：deviceMid 改为空串（厂商设备标识删除；此 manager 属官方中继链路，P3 移除）。
-  deviceMid: "",
-  deviceName: hostname(),
-  appVersion: webRemoteControlAppVersion,
-  getLogin: async () => undefined,
-  deviceStorage: createWebRemoteControlDeviceStorage({
-    deleteLegacyCredential: () =>
-      webRemoteControlCredentialService.delete("web-remote-control:external-relay:pass_hash"),
-    loadSettings: () => mainSettingService.get(),
-    patchSettings: (patch) => mainSettingService.update(patch),
-  }),
-  startupRestoreStorageProvider: {
-    load: async () => (await mainSettingService.get()).webRemoteControlLastEnabledContext,
-    save: async (context) => {
-      await mainSettingService.update({
-        webRemoteControlLastEnabledContext: {
-          workspacePath: context.workspacePath,
-          workspaceIdentity: context.workspaceIdentity,
-          initialTaskId: context.initialTaskId,
-        },
-      });
-    },
-    clear: async () => {
-      await mainSettingService.update({
-        webRemoteControlLastEnabledContext: undefined,
-      });
-    },
-  },
-  featureGate: createWebRemoteControlFeatureGate(),
-  logger,
-  relayMessageLogger: webRemoteControlRelayLogger,
-  platformHandlers: {
-    isDockerAvailable: () => isDockerDaemonAvailable(),
-    listWSLDistros: () => listAvailableWSLDistros(),
-    listDockerContainers: () => listAvailableDockerContainers(),
-    listSSHConfigAliases: () => listSSHConfigAliases(),
-    createTempTextAttachment: (payload) => createTempTextAttachment(payload),
-    loadMcpFromUserDirectory: (payload) => loadCliMcpFromUserDirectory(payload),
-    saveMcpToUserDirectory: async (payload) => {
-      try {
-        await saveCliMcpToUserDirectory(payload);
-        return { success: true };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn("[web-remote-control] MCP save failed", message);
-        return { success: false, error: message };
-      }
-    },
-    migrateLegacyCommonMcp: (payload) => migrateLegacyCommonMcp(payload),
-  },
-  reconnectWorkspace: reconnectWebRemoteControlWorkspaceInRenderer,
-  prepareProjectWorkspace: async (windowId, project, requestId) => {
-    const win = BrowserWindow.fromId(windowId);
-    if (!win || win.isDestroyed()) throw new Error("项目导航窗口已关闭");
-    return remoteSessionManager.prepareProjectWorkspace(win, project, requestId);
-  },
-  cancelProjectPreparation: (windowId, requestId) => {
-    const win = BrowserWindow.fromId(windowId);
-    if (win && !win.isDestroyed())
-      remoteSessionManager.cancelPendingRemoteWorkspaceSessionsForWindow(
-        win.webContents.id,
-        "mobile-navigation-superseded",
-        requestId,
-      );
-  },
-  reportRendererTelemetryEvent: undefined,
-  reportRemoteUsageEvent: undefined,
-  onStatusChanged: (windowId, status) => {
-    sendWebRemoteControlStatusChangedToWindow(BrowserWindow.fromId(windowId), status);
-  },
-  attachWorkspaceHost: webRemoteControlSharedHostAttachments.attachWorkspaceHost,
-  releaseWorkspaceHostAttachment: webRemoteControlSharedHostAttachments.releaseAttachment,
-  disposeWorkspaceHostAttachmentsForWindow: (windowId) =>
-    webRemoteControlSharedHostAttachments.disposeWindow(windowId),
-  disposeWorkspaceHostAttachmentsForRemoteSession: (remoteSessionId) =>
-    webRemoteControlSharedHostAttachments.disposeRemoteSession(remoteSessionId),
-});
-webRemoteControlManagerRef.current = webRemoteControlManager;
 
 let forceUpdateMainWindowCreationBlocked = false;
 
@@ -1358,7 +1219,6 @@ async function resolveZCodeEndpointSelection(): Promise<"production" | "test" | 
 async function handleZCodeEndpointChanged() {
   rebuildMenu();
   for (const win of getApplicationWindowsExcludingCuaIndicator()) {
-    await webRemoteControlManagerRef.current?.suspend(win.id, "endpoint-changed");
   }
 }
 
@@ -1740,7 +1600,6 @@ function createWindowInstance(startupBootstrap: StartupWindowBootstrap = {}) {
     syncAutoUpdaterStateToWindow,
     syncReadyUpdateToWindow,
     syncPostUpdateReleaseNotesToWindow,
-    webRemoteControlManager,
     disposeRemoteWorkspaceSessionsForWindow:
       remoteSessionManager.disposeRemoteWorkspaceSessionsForWindow,
     reattachRemoteWorkspaceSessionsForWindow:
@@ -1777,7 +1636,9 @@ function createWindowInstance(startupBootstrap: StartupWindowBootstrap = {}) {
 registerDeepLinkProtocol(logger, { iconPath: linuxDesktopIntegrationIconPath });
 app.on("open-url", (event, url) => {
   event.preventDefault();
-  const workspacePath = extractOpenWorkspacePathFromDeepLinkUrl(url);
+  const workspacePath = (() => {
+      try { return extractWorkspaceOpenPath(new URL(url)); } catch { return null; }
+    })();
   if (workspacePath && forceUpdateMainWindowCreationBlocked) {
     logger.warn("[force-update] 已忽略强制升级期间的 open-url workspace 请求");
     focusForceUpdateGateWindow();
@@ -2166,10 +2027,6 @@ app.whenReady().then(async () => {
     getDesktopSessionActivity: () => ({
       runningAgentSessionCount: getRunningAgentSessionCount(),
     }),
-    syncWebRemoteControlWorkspaces: (windowId, workspaces) => {
-      webRemoteControlManager.syncAvailableWorkspaces(windowId, workspaces);
-      void webRemoteControlManager.restorePreviouslyEnabled(windowId, workspaces);
-    },
     syncAppSettings: syncImmediateAppSettings,
     // 设置页置灰查询：monitor 带 stale 缓存，装完 AppIndicator 扩展重开设置页即可刷新。
     // 设置页置灰查询：先确保托盘实例就绪（用户装扩展后首次查询会补建），再返回合并了
@@ -2195,7 +2052,6 @@ app.whenReady().then(async () => {
     logger,
     // BYOK fork P0：registerRemoteIpcHandlers 的 telemetry runtime/core、ARMS 上下文与
     // remote-usage 上报回调已删除（可选参数省略）。
-    webRemoteControlManager,
     createRemoteWorkspaceSession: remoteSessionManager.createRemoteWorkspaceSession,
     disposeRemoteWorkspaceSession: remoteSessionManager.disposeRemoteWorkspaceSession,
     cancelPendingRemoteWorkspaceSessionsForWindow:

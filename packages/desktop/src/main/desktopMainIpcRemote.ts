@@ -21,10 +21,6 @@ import {
   clearOAuthRoutesForWindow,
   deliverPendingDeepLink,
 } from "./desktopOAuthDeepLink.js";
-import {
-  registerWebRemoteControlIpcHandlers,
-  type WebRemoteControlIpcManager,
-} from "./desktopWebRemoteControlIpc.js";
 import { openFileUrlInDefaultApp, openPathInDefaultApp } from "./desktopMainIpcHelpers.js";
 
 function isPublicRemoteReasonCode(code: string | undefined): code is string {
@@ -165,7 +161,6 @@ export function registerRemoteIpcHandlers(options: {
   };
   // BYOK fork P0：telemetry runtime/core、remote-usage 上报、ARMS 上下文与 E2E 桥
   // 均为可选注入，已全部从调用方移除；此文件保留平台 IPC 形状，遥测通道变为 no-op。
-  webRemoteControlManager: WebRemoteControlIpcManager;
   createRemoteWorkspaceSession: (
     win: BrowserWindow,
     target: RemoteTarget,
@@ -228,10 +223,7 @@ export function registerRemoteIpcHandlers(options: {
       attachmentId,
     });
   });
-  // BYOK fork P0：FinalArmsCustomEvent E2E 桥已随 ARMS 删除。
-  registerWebRemoteControlIpcHandlers({
-    webRemoteControlManager: options.webRemoteControlManager,
-  });
+  // BYOK fork P3：WRC IPC（官方中继）已删除。
 
   // BYOK fork P1b：OAuthRegisterState IPC（登录 state→window 注册）已删除。
 

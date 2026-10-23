@@ -14,4 +14,3 @@ export type {
   WebRemoteControlRelayProtocolAdapter,
   WebRemoteControlRelayProtocolOptions,
 } from "./webRemoteControlRelayProtocol.js";
-export * from "./webRemoteControlRelayPayloadSerializer.js";

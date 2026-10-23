@@ -22,8 +22,8 @@ import {
   type CreateTempTextAttachmentRequest,
   type MaterializeWorkflowArtifactFileRequest,
   type UpdateStatePayload,
-  type WebRemoteControlWorkspaceTarget,
   type WindowControlsOverlayReadyPayload,
+  // BYOK fork P3：WebRemoteControlWorkspaceTarget（官方中继）已删除。
 } from "@zcode/shared";
 import { getInstalledEditors } from "./editors.js";
 import { getApplicationIcon } from "./applicationIcons.js";
@@ -87,10 +87,6 @@ export function registerPlatformIpcHandlers(options: {
   syncTaskRealtimeWorkspaceKeys: (windowId: number, workspaceKeys: Iterable<string>) => void;
   getUpdateState: () => UpdateStatePayload;
   openUpdateStatusWindow: () => void;
-  syncWebRemoteControlWorkspaces: (
-    windowId: number,
-    workspaces: WebRemoteControlWorkspaceTarget[],
-  ) => void;
   getDesktopSessionActivity: () => {
     runningAgentSessionCount: number;
   };
@@ -299,8 +295,6 @@ export function registerPlatformIpcHandlers(options: {
     if (!win) {
       return;
     }
-
-    options.syncWebRemoteControlWorkspaces(win.id, result.data);
   });
 
   ipcMain.on(PlatformChannels.SyncWindowUnreadCount, (event, payload: unknown) => {

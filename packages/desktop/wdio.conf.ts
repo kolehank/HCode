@@ -95,7 +95,6 @@ import { createE2EStartupCredentialSeed } from "./test/e2e/helpers/e2e-startup-c
 import { seedRemoteOnboardingFixture } from "./test/e2e/helpers/remote-startup-profile.js";
 import { getE2EProviderEndpointEnv } from "#e2e/helpers/e2e-provider-endpoint";
 import { prepareOAuthCompletionRaceFixture } from "./test/e2e/helpers/oauth-completion-race-fixture.js";
-import { prepareWebRemoteControlAuthGateFixture } from "./test/e2e/helpers/web-remote-control-auth-gate-fixture.js";
 import { prepareAccessToken401Fixture } from "./test/e2e/helpers/access-token-401-fixture.js";
 import { createE2EReplayFixtureVariables } from "./test/e2e/helpers/e2e-runtime-paths.js";
 import { stageE2EAppOutput } from "./test/e2e/helpers/e2e-app-output-stage.js";
@@ -4408,7 +4407,6 @@ async function seedUpstreamE2EModelConfig(specs: string[] = []) {
         // auto compact，把另一条产品路径混进 51 个独立断言并触发无 fixture 重试。
         !spec.includes("conversation-session-virtual-project-cold-roots.test.ts") &&
         // 未读矩阵的多轮完成由显式闸门控制；240 token 窗口会混入无关自动压缩。
-        !spec.includes("conversation-session-web-remote-unread.test.ts") &&
         !spec.includes("conversation-session-tool-cross-product.test.ts") &&
         // SHR04-SHR08 验收同一父 session 的 append-only 前缀；小窗口 compact 会替换历史。
         !spec.includes("conversation-session-subagent-catalog-refresh.test.ts") &&
@@ -4970,12 +4968,7 @@ export const config: WebdriverIO.Config = {
           credentialsFile: E2E_APP_CREDENTIALS_FILE,
           settingsFile: E2E_APP_SETTINGS_FILE,
         });
-        stopWebRemoteControlAuthGateFixture = await prepareWebRemoteControlAuthGateFixture({
-          specs,
-          credentialsFile: E2E_APP_CREDENTIALS_FILE,
-          settingsFile: E2E_APP_SETTINGS_FILE,
-          workspacePath: resolve(E2E_HOME_DIR, "ZCodeProject"),
-        });
+        // BYOK fork P3：auth-gate fixture（官方中继）已删除。
         // resetHome 之后、Electron 启动之前安装，Main -> Host -> Agent 才会同时继承
         // case-owned PATH；其他 spec 由 helper 保持 no-op。
         await installBashPrefixPermissionPnpmShim({

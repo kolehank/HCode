@@ -2,7 +2,7 @@ import type { MobilePluginDiscoveryTelemetry } from "./telemetry.js";
 import { z } from "zod";
 import type { MobileSessionCreateTelemetry } from "./sessionCreateTelemetry.js";
 /* eslint-disable max-lines -- Web 远程控制共享 App payload 与 workspace bridge 契约。 */
-import type { WebRemoteControlRelayV2PairStatus } from "#src/web-remote-relay/index.js";
+// BYOK fork P3：官方中继 relay 类型已删除（pair status 等随 web-remote-relay 目录移除）。
 import type {
   DockerContainerInfo,
   SSHConfigAliasOption,
@@ -588,7 +588,7 @@ export interface WebRemoteControlMobileDiagnosticPayload {
   timestamp: number;
   state?: string;
   previousState?: string;
-  pairStatus?: WebRemoteControlRelayV2PairStatus;
+  // BYOK fork P3：pairStatus（官方中继配对状态）已删除。
   closeCode?: number;
   closeReason?: string;
   wasClean?: boolean;
