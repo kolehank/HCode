@@ -345,3 +345,5 @@ export type {
   GroupNode,
   MoveGroupNode,
 } from "#src/task-groups/contract.js";
+export { IUsageLedgerService } from "./usage-ledger/usageLedgerService.js";
+export type { UsageLedgerSummaryRow } from "./usage-ledger/usageLedgerStore.js";

@@ -1035,6 +1035,11 @@ interface CreateZCodeAgentServiceOptions extends Omit<
     scope: ZCodeSessionRuntimePreferencesScope,
   ) => Promise<ZCodeSessionRuntimePreferencesResult>;
   /** manual run 落库后由当前 host 直接派发；返回时 prompt 必须已被 session 接受。 */
+  /** BYOK fork P5：本地用量账本旁路 sink——只收已校验的 usage.delta 事实，内部自吞异常。 */
+  onConversationUsageDeltaFact?: (event: {
+    workspaceKey: string;
+    fact: Extract<ConversationTelemetryFact, { kind: "usage.delta" }>;
+  }) => void;
   onAutomationManualRunRequested?: (params: {
     automation: ZCodeAutomation;
     run: ZCodeAutomationRun;
@@ -1811,6 +1816,18 @@ export function createZCodeAgentService(
     const existing = conversationTelemetryFactEmitters.get(key);
     if (existing) return existing;
     const created = new Emitter<ConversationTelemetryFact>();
+    // BYOK fork P5：usage.delta 事实旁路投给本地用量账本（纯本地，异常不反噬事件管道）。
+    if (options?.onConversationUsageDeltaFact) {
+      const sink = options.onConversationUsageDeltaFact;
+      created.event((fact) => {
+        if (fact.kind !== "usage.delta") return;
+        try {
+          sink({ workspaceKey: key, fact });
+        } catch {
+          /* 账本 sink 异常不反噬事件管道 */
+        }
+      });
+    }
     conversationTelemetryFactEmitters.set(key, created);
     return created;
   }

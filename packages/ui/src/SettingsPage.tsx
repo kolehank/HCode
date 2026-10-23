@@ -71,6 +71,8 @@ import { WorkspaceFileSearchSection } from "@/settings/WorkspaceFileSearchSectio
 import { MemorySettingsSection } from "@/settings/MemorySettingsSection.js";
 import { BrowserSettingsSection } from "@/settings/BrowserSettingsSection.js";
 import { ComputerUseSection } from "@/settings/ComputerUseSection.js";
+// BYOK fork P5：本地用量账本（纯本地，不上报）。
+import { UsageLedgerSection } from "@/settings/UsageLedgerSection.js";
 import { ShortcutSettingsSection } from "@/settings/ShortcutSettingsSection.js";
 import { MigrationSection } from "@/settings/MigrationSection.js";
 import { SETTINGS_FRAME_CONTENT_CLASSNAME } from "@/settings/SettingsPageParts.js";
@@ -1689,6 +1691,11 @@ export function SettingsPage({
                                 })
                               }
                             />
+                          ) : activeSection === "usage" ? (
+                            <ServiceProvider services={localHostServices}>
+                              {/* BYOK fork P5：用量账本是本机全局事实源；远端 workspace 也不能注入远端 Host。 */}
+                              <UsageLedgerSection isDesktop={Boolean(isDesktop)} />
+                            </ServiceProvider>
                           ) : activeSection === "shortcuts" ? (
                             <ShortcutSettingsSection isDesktop={Boolean(isDesktop)} />
                           ) : activeSection === "modelProvider" ? (

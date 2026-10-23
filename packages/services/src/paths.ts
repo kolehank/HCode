@@ -186,6 +186,11 @@ export function getGitCheckpointIndexRootDir(): string {
 }
 
 /** ~/.zcode/v2/tasks-index.sqlite */
+export function getUsageLedgerDatabasePath(): string {
+  // BYOK fork P5：本地 token 用量账本（~/.zcode/v2/usage-ledger.sqlite）。
+  return join(getAppConfigDir(), "usage-ledger.sqlite");
+}
+
 export function getTasksIndexDatabasePath(): string {
   return join(getAppConfigDir(), "tasks-index.sqlite");
 }

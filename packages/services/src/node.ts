@@ -383,6 +383,7 @@ import { createLegacyTeamOrganizationResolver } from "./model-provider/legacyTea
 import { createObservableSettingService } from "./setting/observableSettingService.js";
 import { createCredentialService } from "./credential/credentialService.js";
 import { createBroadcastService } from "./broadcast/broadcastService.js";
+import { createUsageLedgerService, IUsageLedgerService } from "./usage-ledger/usageLedgerService.js";
 import { createZCodeAgentService } from "./zcode-agent/zcodeAgentService.js";
 import type { ZCodeAgentCommandResolver } from "./zcode-agent/zcodeAgentProcessManager.js";
 import { resolveZCodeAgentPresentationSurface } from "./zcode-agent/zcodeAgentPresentationSurface.js";
@@ -2037,7 +2038,11 @@ export function createLocalServices(options: {
     hostId: options?.projectStorageHostId ?? "local",
     workspaceIdentity: undefined,
   });
+  // BYOK fork P5：本地 token 用量账本（usage-ledger.sqlite）——旁路 sink 接在
+  // usage.delta 事实上，纯本地落盘，不参与任何上报；close 进 dispose 链。
+  const usageLedgerService = createUsageLedgerService();
   const zcodeAgentService = createZCodeAgentService({
+    onConversationUsageDeltaFact: (event) => usageLedgerService.recordUsageDelta(event),
     prepareProjectExecution,
     prepareSessionCreation: async (target) =>
       (await taskIndexRepo.getProjectRepository()).reserveCreatedTask({
@@ -2357,6 +2362,7 @@ export function createLocalServices(options: {
     .register(IZCodeTaskService, zcodeTaskService)
     .register(IZCodeAgentService, zcodeAgentService)
     .register(IZCodeSessionService, zcodeSessionService)
+    .register(IUsageLedgerService, usageLedgerService)
     .register(IProjectService, projectService)
     .register(ITaskGroupService, taskGroupService)
     .register(IRemoteProjectService, remoteProjectService)

@@ -183,6 +183,8 @@ export const ServiceChannels = {
   /** Highspeed 加速卡抽取与分享服务 */
   /** Onboarding 完成记录服务（本地持久化，后续上传服务器） */
   OnboardingRecord: "onboarding-record",
+  /** BYOK fork P5：本地用量账本（纯本地，不上报）。 */
+  UsageLedger: "usage-ledger",
 } as const;
 
 export type ServiceChannelName = (typeof ServiceChannels)[keyof typeof ServiceChannels];
