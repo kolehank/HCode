@@ -2,10 +2,13 @@ import { ZCODE_VERSION, type ZCodeEnv } from "@zcode/shared";
 
 declare const __ZCODE_REMOTE_CDN_RELEASE_ROOTS__: readonly string[] | undefined;
 
+// BYOK fork P6：远程运行资源默认不再指向厂商 CDN（自托管）。缺省 fail-closed——
+// 未配置 ZCODE_CDN_BASE_URL / __ZCODE_REMOTE_CDN_RELEASE_ROOTS__ 时返回空列表，
+// 远程资源下载快速失败；用户通过 env 指向自己的静态资源服务
+// （GitHub Releases / 内网 nginx / caddy 均可，按 <base>/zcode/electron/releases/<version>/ 放置）。
 const REMOTE_CDN_RELEASE_ROOTS = {
-  domestic: "https://cdn.codegeex.cn/zcode/electron/releases",
-  // 开发构建未注入 CDN_DOMAIN 时也须使用当前发布域名，避免仍请求旧域名。
-  overseas: "https://cdn-zcode.z.ai/zcode/electron/releases",
+  domestic: "",
+  overseas: "",
 } as const;
 const TEST_REMOTE_CDN_RELEASE_ROOT = "http://intranet.example.invalid:12345/ssh-remote-assets";
 
@@ -48,6 +51,11 @@ export function resolveRemoteCdnBaseUrls(options: ResolveRemoteCdnOptions = {}):
   if (overrideBaseUrl) {
     return [normalizeBaseUrl(overrideBaseUrl)];
   }
+  // BYOK fork P6：ZCODE_CDN_BASE_URL 是 fork 的自托管入口（最高优先 env）。
+  const cdnBaseUrl = process.env.ZCODE_CDN_BASE_URL?.trim();
+  if (cdnBaseUrl) {
+    return [`${normalizeBaseUrl(cdnBaseUrl)}/${options.version ?? ZCODE_VERSION}`];
+  }
 
   const orderedReleaseRoots = shouldPreferDomesticRemoteCdn(options)
     ? [REMOTE_CDN_RELEASE_ROOTS.domestic, REMOTE_CDN_RELEASE_ROOTS.overseas]
@@ -70,7 +78,10 @@ export function resolveRemoteCdnBaseUrls(options: ResolveRemoteCdnOptions = {}):
     );
   }
 
-  return orderedReleaseRoots.map((releaseRoot) => `${releaseRoot}/${version}`);
+  // fail-closed：无配置时返回空列表，远程资源下载快速失败，不出网。
+  return orderedReleaseRoots
+    .filter((releaseRoot) => releaseRoot.length > 0)
+    .map((releaseRoot) => `${releaseRoot}/${version}`);
 }
 
 export function resolvePrimaryRemoteCdnBaseUrl(

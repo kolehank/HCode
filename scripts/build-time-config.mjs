@@ -41,9 +41,11 @@ export async function resolveBuildTimeConfig(
   return {
     armsRumEndpoint: pickValue(env, defaults, "ZCODE_ARMS_RUM_ENDPOINT"),
     telemetryReportEndpoint: pickValue(env, defaults, "ZCODE_TELEMETRY_REPORT_ENDPOINT"),
-    autoUpdateEnabled: ENABLED_VALUES.has(
-      pickValue(env, defaults, "ZCODE_AUTO_UPDATE").toLowerCase(),
-    ),
+    // BYOK fork P7：autoUpdater 默认关闭（fork 走 GitHub Releases 手动分发）；
+    // 仅显式设置 ZCODE_AUTO_UPDATE=1 时启用（上游 CI 兼容）。
+    autoUpdateEnabled:
+      ENABLED_VALUES.has(pickValue(env, defaults, "ZCODE_AUTO_UPDATE").toLowerCase()) &&
+      process.env.ZCODE_AUTO_UPDATE === "1",
   };
 }
 
