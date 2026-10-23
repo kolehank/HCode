@@ -29,8 +29,7 @@ test("bootstrap install 前只清理 hoisted patched dependency 目标", async (
         },
       }),
     );
-      recursive: true,
-    });
+    await mkdir(join(rootDir, "node_modules/@arms"), { recursive: true });
     await mkdir(join(rootDir, "node_modules/vitest"), { recursive: true });
     await mkdir(join(rootDir, "node_modules/unrelated"), { recursive: true });
 

@@ -306,7 +306,6 @@ export interface ConversationTimelineProps {
   /** 与旧 ChatView 对齐：composer dock 属于同一个滚动视口，sticky 到滚动容器底部。 */
   bottomDock?: ReactNode;
   /** 分享选择面板所在的共享父容器；用于把 dock 的真实位置写入同一坐标系。 */
-  selectionPanelLayoutContainerRef?: { current: HTMLElement | null };
   /**
    * 锁定背景滚动。
    *
@@ -391,7 +390,6 @@ function ConversationTimelineImpl({
   onLoadAllOlder,
   turnNavigatorDirectoryRevision = 0,
   bottomDock,
-  selectionPanelLayoutContainerRef,
   backgroundScrollLocked = false,
   emptyState,
   headerSlot,
@@ -591,10 +589,6 @@ function ConversationTimelineImpl({
   const composerDockRef = useRef<HTMLDivElement>(null);
   const floatingComposerDockRef = useRef(floatingComposerDock);
   floatingComposerDockRef.current = floatingComposerDock;
-  const shareSelectionPanelLayoutRef = useRef<{
-    centerYPx: number;
-    maxHeightPx: number;
-  } | null>(null);
   // 右侧状态面板完整 inline 展开时，中间消息列和输入 dock 必须使用同一偏移；
   // 否则面板会覆盖正文，而不是并排布局。
   const summaryPanelInlineOffsetClassName =

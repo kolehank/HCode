@@ -93,10 +93,14 @@ export async function prepareTasksIndexStorage(
     }
     throw error;
   } finally {
+    // BYOK fork 验收修复：finally 内不再条件 throw（no-unsafe-finally）；
+    // close 失败若已有 failure 则并入原始错误日志，不覆盖正在传播的异常。
     try {
       db.close();
     } catch (error) {
-      if (!failure) throw error;
+      if (!failure) {
+        failure = error;
+      }
     }
   }
   markTasksStorageMigrated(path);

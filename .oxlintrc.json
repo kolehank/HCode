@@ -30,7 +30,11 @@
         "src/runtime/methods/steering.ts",
         "src/runtime/methods/turn.ts",
         "src/runtime/methods/turn-model-step.ts",
-        "**/packages/ui/src/remote-connection-flow/index.ts"
+        "**/packages/ui/src/remote-connection-flow/index.ts",
+        // BYOK fork：上游存量超限文件（逻辑行 >800），沿上游处理方式登记 warn 豁免，
+        // 不为行数机械拆分（fork 删除手术已尽量收缩，剩余为上游既有职责）。
+        "**/packages/ui/src/v4/ConversationTimeline.tsx",
+        "**/packages/ui/src/settings/AutomationsSection.tsx"
       ],
       "rules": {
         "max-lines": ["warn", { "max": 800, "skipBlankLines": true, "skipComments": true }]
