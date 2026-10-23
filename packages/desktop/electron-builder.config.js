@@ -456,6 +456,17 @@ function assertPackagedNodePtyPrebuild(context) {
     throw new Error(`node-pty 预编译产物缺失: ${targetBinaryPath}`);
 }
 
+// BYOK A2：桌面内嵌远程访问入口需要 web 前端产物。这里在打包配置求值期就断言，
+// 比 electron-builder 对 extraResources from 的 ENOENT 报错更可执行。
+const webDistDir = resolve(workspaceRoot, "packages/web/dist");
+if (!existsSync(webDistDir)) {
+  throw new Error(
+    `[electron-builder.config] packages/web/dist 不存在：桌面安装包需要随包内置 web 前端 ` +
+      `(extraResources → resources/web-dist，供内嵌远程访问入口静态 serve)。` +
+      `请先执行 pnpm --filter @zcode/web build（CI 的 build:bootstrap 已包含该步骤）再打包。`,
+  );
+}
+
 function assertPackagedCuaSharp(context) {
   if (!isSharpRequiredByComputerUse({ desktopPackageRoot })) return;
   const problems = [
@@ -730,6 +741,15 @@ export default {
       // 显式随包发布，避免正式 Host 回退到旧 Catalog/Preset hardcode。
       from: builtinProviderConfig.sourcePath,
       to: "config/provider/zcode-builtin.json",
+    },
+    {
+      // BYOK A2：web 前端产物随包发布到 resources/web-dist，桌面内嵌远程访问入口
+      // （packages/desktop/src/main/webRemoteAccess/server.ts）按 process.resourcesPath 静态 serve。
+      // 产物由 build:bootstrap（pnpm -r build，含 @zcode/web）先行产出；缺失时直接失败并给出可执行提示，
+      // 不允许打出「设置页已启用远程访问但浏览器打开无页面」的半残安装包。
+      from: resolve(workspaceRoot, "packages/web/dist"),
+      to: "web-dist",
+      filter: ["**/*", "!**/*.map"],
     },
     {
       // 应用图标：打包后放入 resources 目录，主进程通过 process.resourcesPath 加载

@@ -1218,4 +1218,76 @@ export interface IPlatformService {
    *   抗浏览器/网络/语言/时区变化，换手机才会变
    */
   getDeviceId(): string;
+
+  /**
+   * BYOK A2：桌面内嵌远程访问入口（main 内嵌 HTTP/WS server）的设置页数据源。
+   * 仅 Desktop 实现（preload `webRemoteAccess` 桥 → PlatformChannels IPC）；
+   * Web 形态不实现，RemoteAccessSection 回退到 server HTTP API
+   * （fetchWithWebAccessToken + /api/web-access/*）。
+   */
+  webRemoteAccess?: {
+    /** 读取生效配置视图（sanitize 后）、网卡候选与 web 静态资源可用性。 */
+    getConfig(): Promise<WebRemoteAccessConfigSnapshot>;
+    /** 保存配置；mode=token 且 regenerate/无既有 token 时返回一次性明文 token。 */
+    saveConfig(payload: WebRemoteAccessSaveRequest): Promise<WebRemoteAccessSaveResponse>;
+    /** 重新枚举本机网卡候选（过滤虚拟网卡、标注 tailscale 与建议项）。 */
+    getInterfaces(): Promise<WebAccessInterfaceOption[]>;
+  };
+}
+
+/** BYOK A2：桌面内嵌远程访问的三档鉴权模式；与 @zcode/server 的 WebAccessMode 同构。 */
+export type WebAccessModeOption = "open" | "cloudflare-access" | "token";
+
+/** 桌面内嵌远程访问入口的运行状态视图（tokenHash 等敏感字段永不进入该视图）。 */
+export interface WebRemoteAccessStatus {
+  /** web-access.json 的 desktopEnabled 开关（驱动内嵌 server 启停）。 */
+  enabled: boolean;
+  /** 内嵌 HTTP/WS server 当前是否在监听。 */
+  running: boolean;
+  mode: WebAccessModeOption;
+  port?: number;
+  bindHost?: string;
+  tokenPrefix: string;
+  hasToken: boolean;
+  cfTeamDomain: string;
+  cfAud: string;
+  cfAllowedEmails: string[];
+  externalBaseUrl: string;
+}
+
+/** 可直连的本机网卡候选（server 与 desktop 共用同一过滤/建议规则）。 */
+export interface WebAccessInterfaceOption {
+  name: string;
+  address: string;
+  family: "IPv4" | "IPv6";
+  /** 100.64.0.0/10（tailscale）网段。 */
+  isTailscale: boolean;
+  /** server 侧确定性排序选出的建议项（tailscale > 私网 IPv4 > IPv4 > 首个）。 */
+  suggested: boolean;
+}
+
+/** WebAccessGetConfig 响应：配置视图 + 网卡候选 + web 前端静态资源可用性。 */
+export interface WebRemoteAccessConfigSnapshot {
+  status: WebRemoteAccessStatus;
+  interfaces: WebAccessInterfaceOption[];
+  /** web 前端静态资源目录缺失时为 false：入口只能服务 WS，浏览器打开无页面。 */
+  webStaticConfigured: boolean;
+}
+
+/** WebAccessSaveConfig 请求：字段缺省时保留当前值（与 server PUT 语义一致）。 */
+export interface WebRemoteAccessSaveRequest {
+  mode: WebAccessModeOption;
+  cfTeamDomain?: string;
+  cfAud?: string;
+  cfAllowedEmails?: string[];
+  externalBaseUrl?: string;
+  desktopEnabled?: boolean;
+  regenerate?: boolean;
+}
+
+/** WebAccessSaveConfig 响应：明文 token / 完整访问链接只在生成时刻返回一次。 */
+export interface WebRemoteAccessSaveResponse {
+  status: WebRemoteAccessStatus;
+  token?: string;
+  accessUrl?: string;
 }

@@ -20,6 +20,7 @@ import {
   HardDrive,
   Keyboard,
   FileSearch,
+  Wifi,
 } from "lucide-react";
 import { isSettingsSectionEnabled, type SettingsSectionId } from "@/lib/settingsNavigation.js";
 import type { Theme } from "@/useTheme.js";
@@ -128,6 +129,14 @@ const BASE_SETTINGS_SECTIONS: SettingsSectionDefinition[] = [
     id: "browser",
     icon: Globe2,
     titleId: "settings.browser.title",
+    groupId: "basics",
+  },
+  // BYOK A2：远程访问（三档鉴权 + token/QR 引导 + 桌面内嵌入口开关）紧跟「浏览器」，
+  // 同属连接性基础配置；桌面形态经 IPC 数据源，web 形态走 server HTTP API。
+  {
+    id: "remoteAccess",
+    icon: Wifi,
+    titleId: "settings.remoteAccess.title",
     groupId: "basics",
   },
   // 原型导航顺序：浏览器之后才是远程设备；电脑控制继续紧随其后并受灰度门禁。

@@ -1,8 +1,29 @@
 import { recordArmsCustomEventForE2E } from "@zcode/ui";
-import { DesktopCommandIds, buildLocalMediaPreviewUrl, type IPlatformService } from "@zcode/shared";
+import {
+  DesktopCommandIds,
+  buildLocalMediaPreviewUrl,
+  type IPlatformService,
+  type WebRemoteAccessSaveRequest,
+  type WebRemoteAccessSaveResponse,
+  type WebRemoteAccessConfigSnapshot,
+  type WebAccessInterfaceOption,
+} from "@zcode/shared";
 
 import { desktopBrowserPlatformBridge } from "./desktopBrowserPlatformBridge.js";
 import { createDesktopPluginSandboxPlatform } from "./plugin-sandbox/desktopPluginSandboxPlatform.js";
+
+/** preload `webRemoteAccess` 桥的窄化视图：旧 preload（升级后的旧窗口）可能未暴露该桥。 */
+type ZCodeWebRemoteAccessBridge = {
+  getConfig(): Promise<WebRemoteAccessConfigSnapshot>;
+  saveConfig(payload: WebRemoteAccessSaveRequest): Promise<WebRemoteAccessSaveResponse>;
+  getInterfaces(): Promise<WebAccessInterfaceOption[]>;
+};
+
+function resolveWebRemoteAccessBridge(): ZCodeWebRemoteAccessBridge | undefined {
+  const zcode = (window as Window & { zcode?: { webRemoteAccess?: ZCodeWebRemoteAccessBridge } })
+    .zcode;
+  return zcode?.webRemoteAccess;
+}
 
 export function createDesktopPlatform(options: {
   isLocalDevelopmentRuntime: boolean;
@@ -198,5 +219,12 @@ export function createDesktopPlatform(options: {
     setTitleBarTheme: (theme) => window.zcode.setTitleBarTheme(theme),
     getDeviceId: () =>
       (window as Window & { __ZCODE_DEVICE_ID__?: string }).__ZCODE_DEVICE_ID__ ?? "",
+    webRemoteAccess: resolveWebRemoteAccessBridge()
+      ? {
+          getConfig: () => resolveWebRemoteAccessBridge()!.getConfig(),
+          saveConfig: (payload) => resolveWebRemoteAccessBridge()!.saveConfig(payload),
+          getInterfaces: () => resolveWebRemoteAccessBridge()!.getInterfaces(),
+        }
+      : undefined,
   };
 }

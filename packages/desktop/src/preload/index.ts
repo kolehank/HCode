@@ -84,6 +84,10 @@ import type {
   CreateTempTextAttachmentRequest,
   MaterializeWorkflowArtifactFileRequest,
   OpenCuaPermissionOnboardingOptions,
+  WebRemoteAccessSaveRequest,
+  WebRemoteAccessSaveResponse,
+  WebRemoteAccessConfigSnapshot,
+  WebAccessInterfaceOption,
   ConfigureFinalArmsCustomEventE2ERequest,
   FinalArmsCustomEventE2EEntry,
 } from "@zcode/shared";
@@ -917,6 +921,15 @@ contextBridge.exposeInMainWorld("zcode", {
     ipcRenderer.invoke(PlatformChannels.SetTitleBarTheme, theme),
   /** 获取桌面端设备标识符（deviceMid） */
   getDeviceId: () => ipcRenderer.invoke(PlatformChannels.GetDeviceId),
+  // BYOK A2：桌面内嵌远程访问入口的设置页数据源（main 内嵌 HTTP/WS server 的配置面）。
+  webRemoteAccess: {
+    getConfig: (): Promise<WebRemoteAccessConfigSnapshot> =>
+      ipcRenderer.invoke(PlatformChannels.WebAccessGetConfig),
+    saveConfig: (payload: WebRemoteAccessSaveRequest): Promise<WebRemoteAccessSaveResponse> =>
+      ipcRenderer.invoke(PlatformChannels.WebAccessSaveConfig, payload),
+    getInterfaces: (): Promise<WebAccessInterfaceOption[]> =>
+      ipcRenderer.invoke(PlatformChannels.WebAccessGetInterfaces),
+  },
 });
 
 installPluginSandboxHostBridge();

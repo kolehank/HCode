@@ -15,7 +15,10 @@ import type { ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
 import {
   AppErrorBoundary,
+  attachWebAccessTokenToUrl,
+  consumeWebAccessTokenFromHash,
   ensurePendingTaskDraft,
+  fetchWithWebAccessToken,
   Root,
   ZCodeIntlProvider,
   generateMobileDeviceFingerprint,
@@ -556,6 +559,9 @@ function resolveDefaultWsOrigin(): string {
 }
 
 async function resolveWebBootstrap(): Promise<WebBootstrapResult> {
+  // BYOK P3/A2：token 档从 URL fragment 引导（#token=），读后立即清除并转入 sessionStorage，
+  // 之后的 API fetch 与 WS 连接都经 webAccessToken helper 附带令牌。
+  consumeWebAccessTokenFromHash();
   const params = new URLSearchParams(window.location.search);
   const remoteId = params.get("remote");
   const wsUrl = remoteId
@@ -563,27 +569,27 @@ async function resolveWebBootstrap(): Promise<WebBootstrapResult> {
     : `${resolveDefaultWsOrigin()}/ws`;
 
   if (remoteId) {
-    return { wsUrl };
+    return { wsUrl: attachWebAccessTokenToUrl(wsUrl) };
   }
 
   try {
-    const response = await fetch("/api/server-info", {
+    const response = await fetchWithWebAccessToken("/api/server-info", {
       cache: "no-store",
     });
     if (!response.ok) {
-      return { wsUrl };
+      return { wsUrl: attachWebAccessTokenToUrl(wsUrl) };
     }
     const serverInfo = (await response.json()) as Partial<ServerRemoteInfo>;
     const workspace = Array.isArray(serverInfo.workspaces) ? serverInfo.workspaces[0] : undefined;
     return {
-      wsUrl,
+      wsUrl: attachWebAccessTokenToUrl(wsUrl),
       ...(workspace?.path ? { initialWorkspaceAbsPath: workspace.path } : {}),
       ...(workspace?.workspaceIdentity
         ? { initialWorkspaceIdentity: workspace.workspaceIdentity }
         : {}),
     };
   } catch {
-    return { wsUrl };
+    return { wsUrl: attachWebAccessTokenToUrl(wsUrl) };
   }
 }
 

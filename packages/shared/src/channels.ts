@@ -415,6 +415,12 @@ export const PlatformChannels = {
   TaskNotificationClick: "zcode:task-notification-click",
   /** Renderer → Main：导出日志（打包 ~/.zcode/v2 及外部 agent 日志为 zip 并在 Finder 中显示） */
   ExportLogs: "zcode:export-logs",
+  /** BYOK A2：桌面内嵌远程访问入口的配置读取（sanitize 视图 + port + 网卡列表）。 */
+  WebAccessGetConfig: "zcode:web-access-get-config",
+  /** BYOK A2：保存远程访问配置；mode=token 且 regenerate/无 token 时生成一次性明文 token。 */
+  WebAccessSaveConfig: "zcode:web-access-save-config",
+  /** BYOK A2：枚举本机网卡（过滤虚拟网卡，标注 tailscale 网段与建议项）。 */
+  WebAccessGetInterfaces: "zcode:web-access-get-interfaces",
   /** Renderer → Main：截取当前窗口作为反馈附件 */
   CaptureWindowScreenshot: "zcode:capture-window-screenshot",
   /**

@@ -43,6 +43,7 @@ import {
 import { randomUUID } from "node:crypto";
 import type { UtilityProcess as ElectronUtilityProcess } from "electron";
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { homedir, hostname } from "node:os";
 import {
@@ -201,6 +202,8 @@ import {
   saveCliMcpToUserDirectory,
 } from "./mcpUserDirectory/index.js";
 import { registerRemoteIpcHandlers } from "./desktopMainIpcRemote.js";
+import { WebRemoteAccessController } from "./webRemoteAccess/controller.js";
+import { registerWebRemoteAccessIpc } from "./webRemoteAccess/ipc.js";
 import { registerRendererHeapSampleIpc } from "./processResourceRendererHeapSource.js";
 import { applyDesktopChromiumNetworkPolicies } from "./desktopNetworkPolicy.js";
 import { applyEmbeddedBrowserPermissionPolicy } from "./embeddedBrowserPermissionPolicy.js";
@@ -611,6 +614,40 @@ const cuaPipFocusRouter = createCuaPipFocusRouter({
   },
 });
 const hostRunningTaskCountMap = new Map<ElectronUtilityProcess, number>();
+
+// BYOK A2：桌面内嵌远程访问入口（main 内嵌 HTTP/WS server，desktopEnabled 驱动启停）。
+// Host child 在被问到时才解析：窗口可能晚于 server 启动创建，WS 升级时取「当时」的主窗口 Host。
+const webRemoteAccessController = new WebRemoteAccessController({
+  logger,
+  getHostChild: () => {
+    for (const win of getMainApplicationWindows()) {
+      const child = windowHostProcessMap.get(win.webContents.id);
+      if (child) {
+        return child;
+      }
+    }
+    return undefined;
+  },
+  getWebStaticDir: resolveWebRemoteAccessStaticDir,
+});
+
+/** web 前端静态资源目录：打包态 resources/web-dist（extraResources），开发态 packages/web/dist。 */
+function resolveWebRemoteAccessStaticDir(): string | undefined {
+  if (process.resourcesPath) {
+    const packagedDir = join(process.resourcesPath, "web-dist");
+    if (existsSync(packagedDir)) {
+      return packagedDir;
+    }
+  }
+  if (!app.isPackaged) {
+    // main bundle 位于 out/main；缺产物时提示开发者先跑 pnpm --filter @zcode/web build。
+    const devDir = join(import.meta.dirname, "../../../web/dist");
+    if (existsSync(devDir)) {
+      return devDir;
+    }
+  }
+  return undefined;
+}
 const windowsCuaOperationIndicator = createWindowsCuaOperationIndicator({
   platform: process.platform,
   getLocale: () => currentApplicationLocale,
@@ -888,6 +925,14 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
         await cronSchedulerToDispose?.dispose();
       } catch (error) {
         logger.warn(`[app-quit] cron scheduler dispose failed (${reason}):`, error);
+      }
+    })(),
+    // BYOK A2：内嵌远程访问入口随 app 退出关闭监听与全部 WS 桥，避免退出后端口残留。
+    (async () => {
+      try {
+        await webRemoteAccessController.stop();
+      } catch (error) {
+        logger.warn(`[app-quit] web remote access stop failed (${reason}):`, error);
       }
     })(),
     // remote session、attachment 和 transport 都由窗口 Host 持有；这里先清理
@@ -1775,6 +1820,15 @@ app.whenReady().then(async () => {
     // 读取失败不影响启动，使用默认 homedir
   }
 
+  // BYOK A2：设置 bootstrap（可能覆盖 dataBaseDir）完成后再读 web-access.json，
+  // 保证 getAppConfigDir 解析到用户自定义数据目录；启用时拉起内嵌远程访问入口。
+  // 读取/启动失败不阻断桌面启动，只落日志（状态可由设置页重新保存修复）。
+  try {
+    await webRemoteAccessController.reloadFromDisk();
+  } catch (error) {
+    logger.error("[web-remote-access] reload config failed:", error);
+  }
+
   // scheduler 也会打开 tasks-index；等 Host 完成统一准备，避免在启动页出现前抢先迁移。
   configureDatabaseStartupQuit(() => {
     markExplicitQuit("database-startup-exit");
@@ -2084,6 +2138,12 @@ app.whenReady().then(async () => {
     listAvailableWSLDistros,
     listAvailableDockerContainers,
     listSSHConfigAliases,
+  });
+
+  registerWebRemoteAccessIpc({
+    controller: webRemoteAccessController,
+    logger,
+    getWebStaticDir: resolveWebRemoteAccessStaticDir,
   });
 
   // BYOK fork P0：ARMS init 等待、identity 同步与 stability/resource/mcp/network/data-size
