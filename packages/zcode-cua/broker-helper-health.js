@@ -1,1 +1,6 @@
-export { callBrokerMethod, probeHelperHealth } from "./broker.js";
+export {
+  callBrokerMethod,
+  probeHelperHealth,
+  resolveBrokerSocketPath,
+  mintBrokerSocketPath,
+} from "./broker.js";

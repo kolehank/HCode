@@ -58,5 +58,14 @@
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.json"
   },
-  "zcodeCuaPlaceholder": true
+  "zcodeCuaRuntime": {
+    "schema": 1,
+    "windows": {
+      "entry": "helper/win32-x64/dist/windows-helper.js",
+      "nativeAddon": "helper/win32-x64/build/Release/ax_native.node"
+    }
+  },
+  "dependencies": {
+    "sharp": "^0.34.4"
+  }
 }

@@ -72,6 +72,9 @@ const runtimeModuleLookupRoots = [
   resolve(workspaceRoot, "node_modules", ".pnpm", "node_modules"),
 ];
 const desktopDistDir = process.env.ZCODE_DESKTOP_DIST_DIR || "dist";
+// BYOK fork R5：macOS Helper .app 需 Developer ID 签名+notarization 的独立产线，
+// 本 fork 无签名基础设施，默认不打包 mac helper（ZCODE_PACK_MAC_CUA_HELPER=1 显式开启）。
+const MAC_CUA_HELPER_PACKAGED = process.env.ZCODE_PACK_MAC_CUA_HELPER === "1";
 const bundledCuaHelperSource = resolve(
   desktopPackageRoot,
   "bundled-cua-helper",
@@ -195,7 +198,8 @@ function resolveElectronDownloadMirror(env = process.env) {
 }
 
 function assertPackagedCuaHelper(context) {
-  if (targetPlatform.os !== "darwin" || !shouldPackageComputerUseHelper) return;
+  if (targetPlatform.os !== "darwin" || !shouldPackageComputerUseHelper || !MAC_CUA_HELPER_PACKAGED)
+    return;
   const appPath = join(
     context.appOutDir,
     `${desktopProductIdentity.productName}.app`,
@@ -713,7 +717,7 @@ export default {
     { from: resolve(workspaceRoot, noticesFileName), to: noticesFileName },
     ...(targetPlatform.os === "darwin"
       ? [
-          ...(shouldPackageComputerUseHelper
+          ...(shouldPackageComputerUseHelper && MAC_CUA_HELPER_PACKAGED
             ? [
                 {
                   from: bundledCuaHelperSource,

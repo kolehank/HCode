@@ -31,17 +31,9 @@ export interface CuaHelperVerifierDependencies {
   [key: string]: unknown;
 }
 
-// 公共调用方依赖上下文类型；unknown 曾使日志回调在开源类型检查中失去参数类型。
-export interface BrokerLogger {
-  debug: (traceId: string | undefined, ...args: unknown[]) => void;
-  info: (traceId: string | undefined, ...args: unknown[]) => void;
-  warn: (traceId: string | undefined, ...args: unknown[]) => void;
-  error: (traceId: string | undefined, ...args: unknown[]) => void;
-}
-
 export interface CuaHelperInstallerOptions {
   env?: NodeJS.ProcessEnv;
-  logger?: BrokerLogger;
+  logger?: unknown;
   bundledAppPath?: string;
   plan?: unknown;
   dependencies?: Partial<CuaHelperVerifierDependencies>;
@@ -256,11 +248,3 @@ export declare function requestHelperScreenRecordingPermissionViaLaunchServices(
 ): Promise<HelperPermissionRequestResult>;
 
 export type { CuaPermissionRestartOptions, CuaPermissionRestartResult };
-
-export declare function resolveHelperAppName(env?: NodeJS.ProcessEnv): string;
-export declare function resolveCuaHelperInstallRoot(env: NodeJS.ProcessEnv): string | null;
-export declare function standaloneHelperCandidatePaths(env?: NodeJS.ProcessEnv): string[];
-export declare function injectPermissionBrokerAgentMcpServers<T>(
-  servers: T[] | undefined,
-  options: unknown,
-): T[] | undefined;
