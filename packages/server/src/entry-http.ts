@@ -8,6 +8,8 @@ import {
   readBundledZCodeBuiltinProviderConfig,
 } from "./bundledZCodeBuiltinProviderConfig.js";
 import { createHttpServer, resolveHttpServerId } from "./http.js";
+// BYOK fork P3b：三档远程访问鉴权（web-access.json 为配置唯一所有者）。
+import { loadWebAccessConfig } from "./webAccess/webAccessConfig.js";
 
 async function main(): Promise<void> {
   const zcodeBuiltinProviderConfigFilePath = await materializeBundledZCodeBuiltinProviderConfig({
@@ -15,9 +17,15 @@ async function main(): Promise<void> {
     content: readBundledZCodeBuiltinProviderConfig(),
   });
   const port = Number(process.env["PORT"]) || 3030;
-  const host = process.env["ZCODE_SERVER_HOST"]?.trim() || process.env["HOST"]?.trim() || undefined;
+  // BYOK fork P3b：ZCODE_WEB_BIND_HOST 为 fork 计划变量名，作为 ZCODE_SERVER_HOST 的优先别名。
+  const host =
+    process.env["ZCODE_WEB_BIND_HOST"]?.trim() ||
+    process.env["ZCODE_SERVER_HOST"]?.trim() ||
+    process.env["HOST"]?.trim() ||
+    undefined;
   const staticRoot = process.env["ZCODE_WEB_STATIC_ROOT"]?.trim() || undefined;
   const authToken = process.env["ZCODE_SERVER_AUTH_TOKEN"]?.trim() || undefined;
+  const webAccess = await loadWebAccessConfig();
   const topicResourcePeers = createTopicResourcePeers();
   const serverId = resolveHttpServerId();
   const { services, workspaceIdentityMapper, migrationFailedPathCount } =

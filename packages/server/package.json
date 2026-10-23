@@ -33,6 +33,7 @@
     "follow-redirects": "^1.16.0",
     "form-data": "^4.0.5",
     "hono": "^4.12.9",
+    "jose": "^6.2.2",
     "node-forge": "^1.4.0",
     "node-pty": "^1.0.0",
     "proxy-from-env": "^1.1.0",

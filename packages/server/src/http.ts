@@ -5,6 +5,10 @@ import { hostname, userInfo } from "node:os";
 import * as nodePath from "node:path";
 import { basename, extname, resolve } from "node:path";
 import { Hono, type Context } from "hono";
+// BYOK fork P3b：三档远程访问鉴权与配置路由。
+import { createWebAccessMiddleware } from "./webAccess/webAccessMiddleware.js";
+import { registerWebAccessRoutes } from "./webAccess/webAccessRoutes.js";
+import { getDefaultWebAccessConfig, type WebAccessConfig } from "./webAccess/webAccessConfig.js";
 import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import type { WebSocket } from "ws";
@@ -146,6 +150,8 @@ export interface HttpServerOptions {
   host?: string;
   authRequired?: boolean;
   authToken?: string;
+  /** BYOK fork P3b：三档远程访问鉴权配置（优先于 authToken lite 模式）。 */
+  webAccess?: WebAccessConfig;
   spaFallback?: boolean;
   staticRoot?: string;
   workspaces?: ServerRemoteWorkspaceInfo[];
@@ -346,7 +352,10 @@ export function createHttpServer(
   const hostCapabilities = createHostCapabilityStore();
 
   const authToken = options.authToken?.trim();
-  if (authToken) {
+  if (options.webAccess) {
+    // BYOK fork P3b：三档 web 远程访问鉴权（open 强制回环 / CF Access JWT / 静态 token）。
+    app.use("*", createWebAccessMiddleware(options.webAccess));
+  } else if (authToken) {
     app.use("*", async (c, next) => {
       const pathname = new URL(c.req.url).pathname;
       const validToken = hasValidLiteToken(c, authToken);
@@ -358,6 +367,14 @@ export function createHttpServer(
     });
   }
 
+  // BYOK fork P3b：/api/web-access/* 配置端点（受当前档位鉴权保护）。
+  registerWebAccessRoutes(app, {
+    startupConfig: options.webAccess ?? {
+      // 未启用三档时的只读兜底（open 语义；middleware 未挂载不影响）。
+      ...getDefaultWebAccessConfig(),
+    },
+    port,
+  });
   app.get("/api/server-info", (c) => c.json(createServerInfo(options)));
   app.post("/api/rpc-host-capability", (c) => c.json(hostCapabilities.issue()));
 
@@ -417,7 +434,20 @@ export function createHttpServer(
     });
   }
 
-  const server = serve({ fetch: app.fetch, hostname: options.host, port }, () => {
+  // BYOK fork P3b：open 档（无鉴权）强制回环 bind——不可配置组合出「无鉴权 + 非回环」。
+  const effectiveHost = (() => {
+    if (options.webAccess && options.webAccess.mode === "open") {
+      const configured = options.host?.trim();
+      if (configured && configured !== "127.0.0.1" && configured !== "localhost") {
+        log(
+          `[web-access] open 模式强制 bind 127.0.0.1（已覆盖配置 ${configured}；跨网访问请用 tailscale serve / cloudflared 或切换 token/cloudflare-access 档）`,
+        );
+      }
+      return "127.0.0.1";
+    }
+    return options.host;
+  })();
+  const server = serve({ fetch: app.fetch, hostname: effectiveHost, port }, () => {
     const address = server.address();
     const listenPort = typeof address === "object" && address ? address.port : port;
     const listenHost = options.host?.trim() || "localhost";
