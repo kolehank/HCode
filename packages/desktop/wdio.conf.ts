@@ -68,12 +68,12 @@ import {
   CODING_PLAN_TEAM_MOCK_BASE_URL_ENV,
   CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV,
   applyCodingPlanTeamMockEnv,
-  applyCodingPlanUpgradeMockEnv,
   clearCodingPlanTeamMockEnv,
-  clearCodingPlanUpgradeMockEnv,
   shouldPrepareCodingPlanTeamMock,
   shouldReuseDesktopE2EBuild,
 } from "./test/e2e/helpers/coding-plan-mock-env.js";
+// BYOK fork P1a：coding-plan-upgrade mock server（厂商套餐升级场景）已删除；
+// wdio 的 start/stop stub 化，相关 e2e 用例已随功能删除。
 import { createE2ERendererBridgeRootHooks } from "./test/e2e/helpers/e2e-renderer-bridge-root-hook.js";
 import { installHookTrustFixture } from "./test/e2e/helpers/hook-trust-fixture.js";
 import { resolveUpstreamModels } from "./test/e2e/helpers/upstream-recorded-models.js";
@@ -2419,13 +2419,9 @@ async function stopUpstreamE2EHttp() {
   }
 }
 
-async function startCodingPlanUpgradeE2EMock(
-  _specs: string[] = [],
-  _options: { prepareForBuild?: boolean } = {},
-): Promise<void> {
-  // BYOK fork：coding-plan 升级 mock 已删除（厂商云功能退役），恒 no-op。
+async function startCodingPlanUpgradeE2EMock(): Promise<void> {
+  // BYOK fork P1a：coding-plan 升级 mock server 已删除（厂商云功能）。
 }
-
 // 闲时任务 E2E：off-peak spec 命中时开进程内 mock 网关（ZCODE_OFFPEAK_MOCK=1），
 // host 继承 worker env 后自动起网关、灰度强制开启；管理类 GUI spec 保持票据短暂 queued，
 // 避免创建落库唤醒 scheduler 后在 UI 来得及操作前就派发模型请求。
@@ -2525,24 +2521,9 @@ async function materializeOffPeakMockZCodeBuiltinProviderConfig(
   );
 }
 
-async function stopCodingPlanUpgradeE2EMock() {
-  const ownedBaseUrl =
-    codingPlanUpgradeMockServer?.baseUrl ??
-    process.env[CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV]?.trim() ??
-    "";
-  if (!codingPlanUpgradeMockServer) {
-    if (ownedBaseUrl) {
-      clearCodingPlanUpgradeMockEnv(process.env, ownedBaseUrl);
-    }
-    restoreE2EProviderEndpointEnv();
-    return;
-  }
-  await codingPlanUpgradeMockServer.stop();
-  codingPlanUpgradeMockServer = null;
-  clearCodingPlanUpgradeMockEnv(process.env, ownedBaseUrl);
-  restoreE2EProviderEndpointEnv();
+async function stopCodingPlanUpgradeE2EMock(): Promise<void> {
+  // BYOK fork P1a：coding-plan 升级 mock server 已删除。
 }
-
 function restoreE2EProviderEndpointEnv() {
   const endpointEnv = getE2EProviderEndpointEnv(
     configuredE2ESpecs,
@@ -4776,11 +4757,8 @@ export const config: WebdriverIO.Config = {
         }
         // Bugfix: Coding Plan webview origin 是 Vite 编译期常量；mock 必须先于
         // build 启动并注入 env，否则 renderer 会 baked 线上官网 origin。
-        await startCodingPlanUpgradeE2EMock(configuredE2ESpecs, {
-          prepareForBuild: true,
-        });
-        const codingPlanUpgradeMockBaseUrl =
-          process.env[CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV]?.trim();
+        await startCodingPlanUpgradeE2EMock();
+        const codingPlanUpgradeMockBaseUrl: string | undefined = undefined;
         if (codingPlanUpgradeMockBaseUrl) {
           // 正式 Rewards 用例使用自托管网页，不依赖开发者的 localhost:3000 服务。
           if (configuredE2ESpecs.some((spec) => spec.includes("marketing-touch-rewards"))) {
