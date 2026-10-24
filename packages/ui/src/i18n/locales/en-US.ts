@@ -5523,6 +5523,12 @@ const enUS: Record<string, string> = {
 
   "automations.pageTab.ariaLabel": "Automations page",
   "offPeak.keepAwakeBanner": "Keep the device awake while tasks are running",
+  "settings.remoteAccess.quick.title": "Mobile remote access",
+  "settings.remoteAccess.quick.description": "Scan the QR code or open the link on your phone to access this desktop session",
+  "settings.remoteAccess.quick.goSettings": "Open settings",
+  "settings.remoteAccess.quick.disabledHint": "Remote access is not enabled yet. Enable it in settings first.",
+  "settings.remoteAccess.quick.tokenHint": "Token auth mode. Generating a new link invalidates the old one immediately.",
+  "settings.remoteAccess.quick.noBaseUrlHint": "No external base URL configured yet. Pick a network interface or set a base URL in settings.",
   "automations.pageTab.automation": "Automations",
   "automations.pageTab.workflow": "Workflows",
   "workflows.hub.description":

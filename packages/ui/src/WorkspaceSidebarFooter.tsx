@@ -34,6 +34,7 @@ import {
   Loader2,
   LogOut,
   Maximize,
+  MonitorSmartphone,
   Palette,
   Settings,
   User,
@@ -41,6 +42,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { usePlatform } from "@/hooks/usePlatform.js";
+import { RemoteAccessQuickDialog } from "@/settings/RemoteAccessQuickDialog.js";
 // BYOK fork P1d：useOpenRewards 随 rewards 营销族删除。
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useShortcutCommandLabel } from "@/shortcuts/useShortcutBindings.js";
@@ -179,6 +181,9 @@ export const WorkspaceSidebarFooter = memo(function WorkspaceSidebarFooterCompon
     settingsButtonMode === "back"
       ? intl.formatMessage({ id: "workspace.backToWorkspace" })
       : intl.formatMessage({ id: "settings.title" });
+  // BYOK A2：手机远程快捷入口走自托管链路（RemoteAccessQuickDialog）。
+  const mobileAccessButtonLabel = intl.formatMessage({ id: "settings.remoteAccess.quick.title" });
+  const [remoteAccessQuickOpen, setRemoteAccessQuickOpen] = useState(false);
   const usageButtonClick = onUsageClick ?? onSettingsButtonClick;
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [desktopZoomLevel, setDesktopZoomLevel] = useState(0);
@@ -434,6 +439,20 @@ export const WorkspaceSidebarFooter = memo(function WorkspaceSidebarFooterCompon
           </DropdownMenuContent>
         </DropdownMenu>
         <div className="flex shrink-0 items-center gap-1.5">
+          {isDesktop ? (
+            <ControlHintTooltip title={mobileAccessButtonLabel}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
+                data-testid="task-mobile-access-button"
+                aria-label={mobileAccessButtonLabel}
+                onClick={() => setRemoteAccessQuickOpen(true)}
+              >
+                <MonitorSmartphone className="size-4" />
+              </Button>
+            </ControlHintTooltip>
+          ) : null}
           <ControlHintTooltip title={settingsButtonLabel}>
             <Button
               type="button"
@@ -449,6 +468,12 @@ export const WorkspaceSidebarFooter = memo(function WorkspaceSidebarFooterCompon
           </ControlHintTooltip>
         </div>
       </div>
+      {isDesktop ? (
+        <RemoteAccessQuickDialog
+          open={remoteAccessQuickOpen}
+          onOpenChange={setRemoteAccessQuickOpen}
+        />
+      ) : null}
     </footer>
   );
 });

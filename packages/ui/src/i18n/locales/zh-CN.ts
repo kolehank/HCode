@@ -5246,6 +5246,12 @@ const zhCN: Record<string, string> = {
   // 卡片、实参窗、详情页、运行历史。术语（run = 实例）。
   "automations.pageTab.ariaLabel": "自动化页面",
   "offPeak.keepAwakeBanner": "任务运行期间保持设备唤醒",
+  "settings.remoteAccess.quick.title": "手机远程访问",
+  "settings.remoteAccess.quick.description": "用手机扫码或打开链接，访问当前桌面会话",
+  "settings.remoteAccess.quick.goSettings": "去设置",
+  "settings.remoteAccess.quick.disabledHint": "远程访问尚未开启，请先在设置中开启。",
+  "settings.remoteAccess.quick.tokenHint": "当前为 Token 鉴权模式。生成新访问链接后旧链接立即失效。",
+  "settings.remoteAccess.quick.noBaseUrlHint": "尚未配置外部访问基址，请先在设置中选择网卡或填写基址。",
   "automations.pageTab.automation": "自动化",
   "automations.pageTab.workflow": "工作流",
   "workflows.hub.description": "保存在已打开项目里的工作流，填好参数就能再跑一次。",
