@@ -627,6 +627,9 @@ export default {
     `node_modules/node-pty/prebuilds/${targetPlatform.key}/**`,
   ],
   beforePack: async (context) => {
+    runTimedSync("beforePack:assertWebDistForEmbeddedRemoteAccess", () =>
+      assertWebDistForEmbeddedRemoteAccess(),
+    );
     runTimedSync("beforePack:restoreTargetNodePtyPrebuild", () =>
       restoreTargetNodePtyPrebuild({ desktopPackageRoot, targetPlatform }),
     );
@@ -656,12 +659,8 @@ export default {
       });
     }
   },
-  beforePack: async () => {
-    await Promise.resolve();
-    runTimedSync("beforePack:assertWebDistForEmbeddedRemoteAccess", () =>
-      assertWebDistForEmbeddedRemoteAccess(),
-    );
-  },
+  // BYOK A2 修复：此处曾插入第二个 beforePack 覆盖了上方原 hook（pty restore + NSIS patch），
+  // 导致 linux node-pty 预编译产物缺失。web-dist 断言并入原 hook 后删除重复定义。
   afterExtract: async (context) => {
     // 修复：macOS 重命名阶段会删除归档顶层许可证，必须在 afterExtract 保留目标平台原文。
     const framework = context.packager.info.framework;

@@ -75,3 +75,6 @@ packages/desktop/resources/macos-window-bounds/
 __pycache__/
 *.pyc
 .zcode-runtime
+
+# BYOK fork R5：vendored CUA Windows Helper 载荷（producer 预编译产物，仓库即分发源）
+!packages/zcode-cua/helper/**
