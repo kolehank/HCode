@@ -434,8 +434,6 @@ export const WorkspaceSidebarFooter = memo(function WorkspaceSidebarFooterCompon
           </DropdownMenuContent>
         </DropdownMenu>
         <div className="flex shrink-0 items-center gap-1.5">
-// BYOK fork P3a：官方中继远控入口随 IPC handler 删除（No handler 报错源）；
-          // 手机访问走「设置 → 远程访问」自托管链路。
           <ControlHintTooltip title={settingsButtonLabel}>
             <Button
               type="button"
