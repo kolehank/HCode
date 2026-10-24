@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CRASH_BACKOFF_MS } from "../src/contracts.js";
+import { ControlRequestError } from "../src/ipc/controlError.js";
 import { requestControl } from "../src/ipc/controlClient.js";
 import { DataRootLock } from "../src/runtime/lock.js";
 import { resolveServerLayout } from "../src/runtime/paths.js";
@@ -288,8 +289,27 @@ describe("Supervisor lifecycle", () => {
     ).rejects.toThrow(/timed out/i);
     await waitForState(supervisor, "ready");
     expect(supervisor.status().pid).toBe(42);
-    await new Promise<void>((resolve) => setTimeout(resolve, 100));
-    await supervisor.stop();
+    // 客户端 15ms 超时可能早于服务端 dispatch 返回，waitForState("ready") 会先观
+    // 察到更新前的旧 ready；慢速 CI 上后台 update（含 rollback 重拉旧 Core）可能
+    // 仍未结束，固定 sleep 会撞上 operation-in-progress（错误本身标记 retryable）。
+    // 改为轮询重试 stop，等待 lifecycle 真正空闲，消除时序 flaky。
+    const stopDeadline = Date.now() + 5_000;
+    for (;;) {
+      try {
+        await supervisor.stop();
+        break;
+      } catch (error) {
+        if (
+          error instanceof ControlRequestError &&
+          error.code === "operation-in-progress" &&
+          Date.now() < stopDeadline
+        ) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 20));
+          continue;
+        }
+        throw error;
+      }
+    }
   });
 
   it("launches the recovered release after claiming a stale startup lock", async () => {
