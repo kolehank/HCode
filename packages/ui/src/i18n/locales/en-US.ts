@@ -5522,6 +5522,7 @@ const enUS: Record<string, string> = {
   "chat.toolCall.workflow.models.truncated": "Not all models are shown",
 
   "automations.pageTab.ariaLabel": "Automations page",
+  "offPeak.keepAwakeBanner": "Keep the device awake while tasks are running",
   "automations.pageTab.automation": "Automations",
   "automations.pageTab.workflow": "Workflows",
   "workflows.hub.description":

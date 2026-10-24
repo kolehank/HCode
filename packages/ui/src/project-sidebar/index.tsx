@@ -15,10 +15,8 @@ import type {
 } from "@/project-sidebar/contract.js";
 import { useProjectPinIntent } from "@/project-sidebar/useProjectPinIntent.js";
 import { ProjectTaskListContext } from "@/project-sidebar/ProjectTaskListContext.js";
-import { useWebRemoteControlStatus } from "@/hooks/useWebRemoteControlStatus.js";
 import { useProjectRemoteSync } from "@/project-sidebar/useProjectRemoteSync.js";
 import { useProjectConnectionDiagnostics } from "@/project-sidebar/useProjectConnectionDiagnostics.js";
-import { useWebRemoteControlFeatureEnabled } from "@/WebRemoteControlFeatureProvider.js";
 import { useProjectDirectory } from "@/project-sidebar/ProjectDirectoryProvider.js";
 export {
   ProjectDirectoryProvider,
@@ -105,15 +103,9 @@ export const ProjectSidebar = memo(function ProjectSidebar(props: ProjectSidebar
   );
   const [remotePicker, setRemotePicker] = useState<RemoteProjectHost | null>(null);
   const { openFiles, openTaskFiles } = useProjectFileTree(props, directory, remoteService);
-  const remoteControlEnabled = useWebRemoteControlFeatureEnabled();
-  const mobileStatus = useWebRemoteControlStatus({
-    enabled: Boolean(props.isDesktop && remoteControlEnabled),
-  });
-  const mobileView = mobileStatus.mobileConnected ? mobileStatus.mobileViewState : null;
-  const mobileActiveTaskKey =
-    mobileView?.activeWorkspaceKey && mobileView.activeTaskId
-      ? `${mobileView.activeWorkspaceKey}:${mobileView.activeTaskId}`
-      : null;
+  // BYOK fork P3a：desktop 端状态轮询随官方中继删除，mobileActiveTaskKey 恒 null，
+  // 未读信号由任务事件与 tabStore 本地状态承载。
+  const mobileActiveTaskKey: string | null = null;
   const taskPresentation = useMemo(
     () => ({
       isWebRemoteControl: props.isWebRemoteControl,
@@ -131,7 +123,6 @@ export const ProjectSidebar = memo(function ProjectSidebar(props: ProjectSidebar
       openTaskFiles,
     ],
   );
-  const msg = (id: string) => intl.formatMessage({ id: `project.${id}` });
   const start = async (projectId?: string, hostId?: string, taskGroupId?: string | null) => {
     const activeTaskId = useZCodeSessionStore
       .getState()
@@ -342,7 +333,6 @@ export const ProjectSidebar = memo(function ProjectSidebar(props: ProjectSidebar
                 workspacePath={props.workspacePath}
                 // 项目侧栏不再从 tab 反推身份；远控入口必须沿用当前 attachment 的精确 scope。
                 workspaceIdentity={props.workspaceIdentity}
-                workspaceRemoteSessionId={props.workspaceRemoteSessionId}
                 isDesktop={props.isDesktop}
                 banner={banner}
               />

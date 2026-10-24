@@ -2,8 +2,6 @@ import { mobilePluginDiscoveryTelemetrySchema } from "@zcode/shared";
 import {
   sessionCreateTelemetrySchema,
   type RendererTelemetryEventPayload,
-  WEB_REMOTE_CONTROL_WORKSPACE_RECONNECT_TIMEOUT_MS,
-  createWebRemoteControlConnectionRecoveryTimeoutFailure,
   resolveWebRemoteControlRelayWsUrl,
   matchesWebRemoteControlRoutePath,
   resolveWebRemoteControlRoutePathFromBaseUrl,
@@ -384,14 +382,6 @@ function createWebPlatform(options?: {
       };
     },
     cancelPendingRemoteConnection: (_requestId?: string) => Promise.resolve(),
-    // Web 端不作为 Web 远程控制的发起端，保留空实现以兼容统一接口。
-    startWebRemoteControl: () =>
-      Promise.reject(new Error("Web remote control can only be started from desktop")),
-    stopWebRemoteControl: () => Promise.resolve(),
-    getWebRemoteControlStatus: () =>
-      Promise.resolve<WebRemoteControlStatus>({
-        status: "idle",
-      }),
     disposeRemoteSession: () => Promise.resolve(),
     isDockerAvailable: () =>
       platformProxy

@@ -73,10 +73,8 @@ import type {
   SaveFileResult,
   PrintPageToPdfResult,
   SSHConfigAliasOption,
-  WebRemoteControlContext,
   WebRemoteControlReconnectWorkspaceRequest,
   WebRemoteControlReconnectWorkspaceResult,
-  WebRemoteControlStatus,
   WebRemoteControlWorkspaceTarget,
   RemoteConnectionRuntimeLog,
   WindowControlsOverlayMetrics,
@@ -294,19 +292,9 @@ contextBridge.exposeInMainWorld("zcode", {
       .then((result: BindRemoteWorkspaceSessionContextIpcResult) =>
         unwrapRemoteWorkspaceBindResult(result),
       ),
-  startWebRemoteControl: (context: WebRemoteControlContext) =>
-    ipcRenderer.invoke(PlatformChannels.StartWebRemoteControl, context),
-  stopWebRemoteControl: (): Promise<void> =>
-    ipcRenderer.invoke(PlatformChannels.StopWebRemoteControl),
-  getWebRemoteControlStatus: () => ipcRenderer.invoke(PlatformChannels.GetWebRemoteControlStatus),
-  onWebRemoteControlStatusChanged: (
-    callback: (status: WebRemoteControlStatus) => void,
-  ): (() => void) => {
-    const handler = (_event: unknown, payload: WebRemoteControlStatus) => callback(payload);
-    ipcRenderer.on(PlatformChannels.WebRemoteControlStatusChanged, handler);
-    return () =>
-      ipcRenderer.removeListener(PlatformChannels.WebRemoteControlStatusChanged, handler);
-  },
+  // BYOK fork P3a：官方中继删除后 Start/Stop/GetWebRemoteControl 的 main 端 handler
+  // 已不存在；desktop 侧远控状态轮询与入口随之移除，手机远控走「设置 → 远程访问」
+  // 自托管链路（webRemoteAccess），不经此 preload 桥。
   disposeRemoteSession: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke(PlatformChannels.DisposeRemoteSession, sessionId),
   isDockerAvailable: (): Promise<boolean> => ipcRenderer.invoke(PlatformChannels.IsDockerAvailable),

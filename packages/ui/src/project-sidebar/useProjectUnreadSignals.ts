@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { useOptionalPlatform } from "@/hooks/usePlatform.js";
 import type {
   ProjectTaskRef,
-  WebRemoteControlStatus,
   WindowHostTaskUnreadSignal,
 } from "@/project-sidebar/contract.js";
 import { mutateProjectTask, readProjectTaskMeta } from "@/project-sidebar/task-mutation.js";
@@ -134,7 +133,7 @@ export function useProjectUnreadSignals(
         if (!entry.written || entry.marker == null) continue;
         // focus 与 visibilitychange-visible 可能连发：在途清除去重，避免重复 mark-read。
         if (foregroundPendingClearsRef.current.has(key)) continue;
-        if (!(isDesktopViewing(entry.target) || isRemoteViewing(entry.target))) continue;
+        if (!isDesktopViewing(entry.target)) continue;
         foregroundPendingClearsRef.current.add(key);
         // mark-read 排在同一任务队列里补写之后执行：此时补写回包已到、marker 已就位。
         // marker 仍为空说明补写失败（保留记录等下次离开重试）；CAS 成功才移除记录。
@@ -164,83 +163,6 @@ export function useProjectUnreadSignals(
           });
       }
     };
-    let remoteView: WebRemoteControlStatus["mobileTaskView"];
-    let statusEventSeen = false;
-    let statusReady = !platform;
-    let releaseStatus!: () => void;
-    const initialStatus = new Promise<void>((resolve) => {
-      releaseStatus = resolve;
-    });
-    if (statusReady) releaseStatus();
-    const isRemoteViewing = (target: WindowHostTaskUnreadSignal["address"]) =>
-      remoteView?.taskId === target.taskId &&
-      (remoteView.workspaceIdentity?.trim() || remoteView.workspacePath) ===
-        (target.workspaceIdentity?.trim() || target.workspacePath) &&
-      (!remoteView.remoteSessionId ||
-        !target.remoteSessionId ||
-        remoteView.remoteSessionId === target.remoteSessionId);
-    const acceptStatus = (status: WebRemoteControlStatus) => {
-      if (disposed) return;
-      // 只消费 Main 验证后的瞬时查看事实；最后导航位置与连接状态宽限都不能代替它。
-      const previousViewKey = remoteView
-        ? JSON.stringify([taskKey(remoteView), remoteView.remoteSessionId])
-        : null;
-      remoteView = status.mobileTaskView;
-      statusReady = true;
-      releaseStatus();
-      let pendingWrite = false;
-      for (const operation of pending)
-        if (isRemoteViewing(operation.target)) {
-          operation.viewed = true;
-          pendingWrite ||= operation.started;
-        }
-      if (
-        !remoteView ||
-        previousViewKey === JSON.stringify([taskKey(remoteView), remoteView.remoteSessionId]) ||
-        pendingWrite
-      )
-        return;
-      const target = remoteView;
-      // 已有在途写时沿用其精确回包CAS；写入已结束的新查看才读取权威marker。
-      // 后续完成命令排在此次读取和CAS之后，不能读到离开后产生的新marker。
-      void enqueueForegroundCommand(target, async () => {
-        const meta = await readProjectTaskMeta(ports, target, target.remoteSessionId);
-        if (disposed || meta?.unreadAt == null) return;
-        await mutateProjectTask(
-          ports,
-          target,
-          { kind: "mark-read", expectedUnreadAt: meta.unreadAt },
-          target.remoteSessionId,
-        );
-      })
-        .then(() => {
-          if (!disposed) return latestRefresh.current();
-        })
-        .catch((error) => {
-          if (!disposed) {
-            logger.warn("[project-sidebar] 查看任务已读写入失败", { ...target, error });
-            void latestRefresh.current();
-          }
-        });
-    };
-    // 必须逐事件处理；React state 合批会丢失“查看后立即离开”的事实。
-    const unsubscribeStatus = platform?.onWebRemoteControlStatusChanged?.((status) => {
-      statusEventSeen = true;
-      acceptStatus(status);
-    });
-    if (platform)
-      void platform
-        .getWebRemoteControlStatus()
-        .then((status) => {
-          if (!statusEventSeen) acceptStatus(status);
-        })
-        .catch((error) => {
-          if (disposed || statusEventSeen) return;
-          // 状态不可读时不猜测“已经看过”，也不让本地完成写永久等待；新有效查看仍会通过精确 CAS 收敛。
-          statusReady = true;
-          releaseStatus();
-          logger.warn("[project-sidebar] 查看状态初始读取失败", error);
-        });
     const isDesktopViewing = (target: ProjectTaskRef) => {
       const tabState = tabs.getState();
       const tab = tabState.tabs.find((item) => item.id === tabState.activeTabId);
@@ -300,7 +222,7 @@ export function useProjectUnreadSignals(
       )
         return;
       received.current.set(key, signal);
-      if (isDesktopViewing(target) || isRemoteViewing(target)) {
+      if (isDesktopViewing(target)) {
         // 信号到达时页面已隐藏（最小化），不会再有 blur 事件，直接补写。
         foregroundCompletions.set(taskKey(target), { target, written: false });
         if (document.hidden) flushOnLeave();
@@ -313,9 +235,7 @@ export function useProjectUnreadSignals(
       let committed = false;
       void enqueueForegroundCommand(target, async () => {
         try {
-          if (!statusReady) await initialStatus;
-          if (disposed || operation.viewed || isDesktopViewing(target) || isRemoteViewing(target))
-            return;
+          if (disposed || isDesktopViewing(target)) return;
           operation.started = true;
           const meta = await mutateProjectTask(
             ports,
@@ -329,7 +249,7 @@ export function useProjectUnreadSignals(
             await mutateProjectTask(
               ports,
               target,
-              { kind: "mark-read", expectedUnreadAt: meta.unreadAt },
+              { kind: "mark-read", expectedUnreadAt: meta.unreadAt as number },
               target.remoteSessionId,
             );
         } finally {
@@ -375,11 +295,9 @@ export function useProjectUnreadSignals(
       disposed = true;
       subscriptions.forEach((subscription) => subscription.dispose());
       navigation.dispose();
-      unsubscribeStatus?.();
       window.removeEventListener("blur", flushOnLeave);
       window.removeEventListener("focus", flushThenClear);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      releaseStatus();
     };
   }, [services, tabs, platform, services.windowControllerService ? "controller" : scopeKey]);
 }

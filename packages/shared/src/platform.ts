@@ -16,9 +16,7 @@ import type {
 import type { OAuthStateRegistration } from "./oauth.js";
 import type {
   WebRemoteControlAuthStateChange,
-  WebRemoteControlContext,
   WebRemoteControlReconnectWorkspaceResult,
-  WebRemoteControlStartOperationResult,
   WebRemoteControlStatus,
   WebRemoteControlReconnectWorkspaceRequest,
   WebRemoteControlWorkspaceTarget,
@@ -786,22 +784,8 @@ export interface IPlatformService {
     context: BindRemoteWorkspaceSessionContextRequest,
   ): Promise<BindRemoteWorkspaceSessionContextResult>;
 
-  /** 为当前 workspace 开启 Web 远程控制能力 */
-  startWebRemoteControl(
-    context: WebRemoteControlContext,
-  ): Promise<WebRemoteControlStartOperationResult>;
-
-  /** 关闭当前窗口已开启的 Web 远程控制能力 */
-  stopWebRemoteControl(): Promise<void>;
-
-  /** 查询当前窗口 Web 远程控制状态 */
-  getWebRemoteControlStatus(): Promise<WebRemoteControlStatus>;
-
   /** 桌面 OAuth 会话通知；main 独立重读凭据后决定是否恢复远控。 */
   notifyWebRemoteControlAuthStateChanged?(change: WebRemoteControlAuthStateChange): void;
-
-  /** 订阅当前窗口 Web 远程控制状态变化；旧平台可不实现，UI 会保留轮询兜底 */
-  onWebRemoteControlStatusChanged?(handler: (status: WebRemoteControlStatus) => void): () => void;
 
   /** 释放当前窗口里已创建的远程 session */
   disposeRemoteSession(sessionId: string): Promise<void>;

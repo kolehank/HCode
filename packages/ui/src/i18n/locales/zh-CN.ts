@@ -5245,6 +5245,7 @@ const zhCN: Record<string, string> = {
   // ── 已保存工作流的 GUI 中枢：自动化页「工作流」标签、
   // 卡片、实参窗、详情页、运行历史。术语（run = 实例）。
   "automations.pageTab.ariaLabel": "自动化页面",
+  "offPeak.keepAwakeBanner": "任务运行期间保持设备唤醒",
   "automations.pageTab.automation": "自动化",
   "automations.pageTab.workflow": "工作流",
   "workflows.hub.description": "保存在已打开项目里的工作流，填好参数就能再跑一次。",
