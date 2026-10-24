@@ -225,6 +225,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      # BYOK fork 修复：gh release create 需要仓库上下文（曾因缺 checkout 报
+      # "not a git repository" 失败，v3.100.0 的资产由维护者手动补传）。
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
