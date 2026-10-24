@@ -12,10 +12,9 @@ import {
   buildVisibleFamilyConnectionKeys,
   resolveCodingPlanEntitlementState,
 } from "@/settings/model-provider-section/providerFamilyConnectionVisibility.js";
-import {
-  CODING_PLAN_PROVIDER_SPECS,
-  type CodingPlanStatus,
-  type ModelProviderNavGroup,
+import type {
+  CodingPlanStatus,
+  ModelProviderNavGroup,
 } from "@/settings/model-provider-section/constants.js";
 
 type ProviderOverrides = Partial<ProviderSettingsFormProvider> & {
@@ -357,20 +356,6 @@ describe("buildVisibleFamilyConnectionKeys", () => {
       ).toBe("unavailable");
     },
   );
-
-  it("BigModel 个人套餐管理入口使用当前环境的个人套餐页", () => {
-    const bigmodelSpecs = CODING_PLAN_PROVIDER_SPECS.filter(
-      (item) =>
-        item.id === BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan ||
-        item.id === BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan,
-    );
-
-    // BYOK fork P1b：厂商业务端点 fail-closed 为 .invalid 占位。
-    expect(bigmodelSpecs.map((item) => item.purchaseUrl)).toEqual([
-      "https://bigmodel.invalid/coding-plan/personal/overview",
-      "https://bigmodel.invalid/coding-plan/personal/overview",
-    ]);
-  });
 
   it("输入框连接方式保留未购买 Coding Plan", () => {
     const keys = buildVisibleFamilyConnectionKeys({

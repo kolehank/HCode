@@ -33,7 +33,6 @@ import { logger } from "@/logger.js";
 import {
   PRESET_PROVIDER_SPECS,
   PRESET_SUBSCRIPTION_TIMEOUT_MS,
-  BIGMODEL_REGISTRATION_URL,
   type CodingPlanStatus,
   type ModelProviderNavGroup,
 } from "./model-provider-section/constants.js";
@@ -1125,14 +1124,6 @@ export function ModelProviderSection({
           onTestModel={handleTestModel}
           onOpenApiKeyUrl={handleOpenApiKeyUrl}
           onSelectNavItem={handleSelectNavItem}
-          onOpenBigModelRegistration={() => {
-            // 未注册提示来自一次失败的 OAuth checking 状态；跳转注册后要恢复普通状态，避免提示卡住。
-            setOAuthError(null);
-            setPresetSubscriptionProviderId((current) =>
-              current === BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan ? null : current,
-            );
-            platform.openExternal(BIGMODEL_REGISTRATION_URL);
-          }}
         />
       )}
     </ModelProviderSectionLayout>

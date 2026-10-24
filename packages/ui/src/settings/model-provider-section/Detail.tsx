@@ -77,7 +77,6 @@ export function ModelProviderSectionDetail({
   onReorderProviderModels,
   onTestModel,
   onOpenApiKeyUrl,
-  onOpenBigModelRegistration,
   onSelectNavItem,
   providerSettingsView: providerSettingsViewOverride,
 }: {
@@ -104,7 +103,6 @@ export function ModelProviderSectionDetail({
   onReorderProviderModels?: (providerId: string, modelIds: string[]) => Promise<void>;
   onTestModel: (providerId: string, modelId: string) => Promise<ModelConnectivityResult>;
   onOpenApiKeyUrl: (url: string) => void;
-  onOpenBigModelRegistration: () => void;
   onSelectNavItem?: (item: ModelProviderNavItem) => void;
   providerSettingsView?: ProviderSettingsView | null;
 }) {

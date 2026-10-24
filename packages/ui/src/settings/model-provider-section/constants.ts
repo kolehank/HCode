@@ -1,12 +1,8 @@
 import {
-  BIGMODEL_PROVIDER_ID,
-  buildBigModelApiUrl,
-  buildBigModelCodingPlanPersonalManageUrl,
   BUILTIN_MODEL_PROVIDER_IDS,
   createUuid,
   type OAuthProviderId,
   ZCODE_ENV,
-  ZAI_PROVIDER_ID,
   type BuiltinModelProviderId,
   type UsageQuotaLimit,
   type UsageEntitlementSubscriptionDetail,
@@ -20,10 +16,6 @@ export function generateId(): string {
 }
 
 export const PRESET_SUBSCRIPTION_TIMEOUT_MS = 2 * 60 * 1000;
-export const BIGMODEL_REGISTRATION_URL = buildBigModelApiUrl({ ZCODE_ENV }, "/login");
-export const BIGMODEL_CODING_PLAN_PERSONAL_MANAGE_URL = buildBigModelCodingPlanPersonalManageUrl({
-  ZCODE_ENV,
-});
 
 export interface PresetProviderSpec {
   id: BuiltinModelProviderId;
@@ -31,18 +23,12 @@ export interface PresetProviderSpec {
   oauthProviderId?: OAuthProviderId;
 }
 
-export const PRESET_PROVIDER_SPECS: PresetProviderSpec[] = [
-  {
-    id: BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan,
-    displayName: "Z.ai",
-    oauthProviderId: ZAI_PROVIDER_ID,
-  },
-  {
-    id: BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan,
-    displayName: "BigModel",
-    oauthProviderId: BIGMODEL_PROVIDER_ID,
-  },
-];
+export const PRESET_PROVIDER_SPECS: PresetProviderSpec[] = [];
+// BYOK fork：OAuth 账号衍生的官方入口（Z.ai/BigModel Start Plan、Coding Plan 订阅管理）
+// 已随 P1b OAuth 体系一并移除；Z.ai/BigModel 的 BYOK 用法走 api-key 模板
+// （zai-api / bigmodel-api，zhipu-coding-plan-api-key 鉴权；及 *-standard-api api-key 型），在「自定义」分组。
+// 数组保留空壳以维持导航分组与调用方类型稳定，shared family 类型暂作死词汇表。
+export const CODING_PLAN_PROVIDER_SPECS: CodingPlanProviderSpec[] = [];
 
 export const PRESET_PROVIDER_SPEC_BY_ID = new Map<BuiltinModelProviderId, PresetProviderSpec>(
   PRESET_PROVIDER_SPECS.map((item) => [item.id, item]),
@@ -74,37 +60,6 @@ interface CodingPlanProviderSpec {
   purchaseUrl?: string;
 }
 
-export const CODING_PLAN_PROVIDER_SPECS: CodingPlanProviderSpec[] = [
-  {
-    id: BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan,
-    oauthProviderId: ZAI_PROVIDER_ID,
-    label: "Z.ai - Coding Plan",
-    providerName: "Z.ai",
-    purchaseUrl: "https://z.ai/manage-apikey/subscription",
-  },
-  {
-    id: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-    oauthProviderId: ZAI_PROVIDER_ID,
-    label: "Z.ai - Coding Plan",
-    providerName: "Z.ai",
-    purchaseUrl: "https://z.ai/manage-apikey/subscription",
-  },
-  {
-    id: BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
-    oauthProviderId: BIGMODEL_PROVIDER_ID,
-    label: "BigModel - Coding Plan",
-    providerName: "BigModel",
-    purchaseUrl: BIGMODEL_CODING_PLAN_PERSONAL_MANAGE_URL,
-  },
-  {
-    id: BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan,
-    oauthProviderId: BIGMODEL_PROVIDER_ID,
-    label: "BigModel- Coding Plan",
-    providerName: "BigModel",
-    purchaseUrl: BIGMODEL_CODING_PLAN_PERSONAL_MANAGE_URL,
-  },
-];
-
 export interface CodingPlanEntitlementState {
   snapshot: UsageEntitlementSnapshot | null;
   loading: boolean;
@@ -114,21 +69,8 @@ export interface CodingPlanEntitlementState {
 export function resolveModelProviderDisplayName(
   provider: Pick<ProviderSettingsFormProvider, "providerId" | "config">,
 ): string {
-  if (
-    provider.providerId === BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan ||
-    provider.providerId === BUILTIN_MODEL_PROVIDER_IDS.zaiTeamCodingPlan
-  ) {
-    return "Z.ai - Coding Plan";
-  }
-
-  if (provider.providerId === BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan) {
-    return "Start Plan";
-  }
-
-  if (provider.providerId === BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan) {
-    return "Start Plan";
-  }
-
+  // BYOK fork：OAuth 账号体系的 Coding Plan / Start Plan 名称分支已随入口删除；
+  // 剩余 provider（含 zai/bigmodel 的 api-key 模板）一律走表单标签。
   return getProviderFormLabel(provider);
 }
 
