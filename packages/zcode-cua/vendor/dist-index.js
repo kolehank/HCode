@@ -4,9 +4,24 @@
 // everything after this prelude is the shipped compiled artifact.
 // ---------------------------------------------------------------------------
 import { createRequire as __createRequire } from "node:module";
-var __requireReal = __createRequire(import.meta.url);
+// BYOK fork R5 修复：CLI/SEA 把本模块内联进 CJS bundle（esbuild format=cjs）时，
+// import.meta.url 被替换为空对象（url=undefined），顶层 createRequire(undefined)
+// 会在启动即抛 "filename must be a file URL"。此处改为惰性解析：首次 require 时
+// 优先用 import.meta.url（ESM 独立运行原路径），CJS bundle 下回退 typeof require。
+var __requireReal;
+var __requireLazy = (x) => {
+  if (!__requireReal) {
+    __requireReal =
+      typeof import.meta.url === "string"
+        ? __createRequire(import.meta.url)
+        : typeof require === "function"
+          ? require
+          : __createRequire(process.execPath);
+  }
+  return __requireReal(x);
+};
 var createRequire = __createRequire;
-var __require = (x) => __requireReal(x);
+var __require = __requireLazy;
 var __defProp = Object.defineProperty;
 var __defProps = Object.defineProperties;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
