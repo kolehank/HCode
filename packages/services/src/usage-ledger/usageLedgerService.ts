@@ -1,13 +1,17 @@
 import type { ConversationTelemetryFact } from "@zcode/shared/zcode-protocol-v4";
 import { ServiceChannels } from "@zcode/shared";
 import { createServiceDescriptor } from "../descriptors.js";
-import { createServiceLogger } from "../logger/serviceLogger.js";
-import {
+// BYOK fork 白屏修复：这里必须全部 type-only import。UsageLedgerStore 值 import 会把
+// usageLedgerStore.js（顶层 import #src/paths.js，模块加载即执行 homedir()）拉进 renderer
+// bundle——vite 对浏览器环境把 node:os stub 成空对象，desktop renderer 白屏
+// （Uncaught TypeError: homedir is not a function）。host 侧 createUsageLedgerService
+// 在函数体内动态 import store 实现，renderer 侧只保留类型与 descriptor。
+import type {
   UsageLedgerStore,
-  type UsageLedgerAppendRow,
-  type UsageLedgerEntry,
-  type UsageLedgerGroupBy,
-  type UsageLedgerSummaryRow,
+  UsageLedgerAppendRow,
+  UsageLedgerEntry,
+  UsageLedgerGroupBy,
+  UsageLedgerSummaryRow,
 } from "./usageLedgerStore.js";
 
 /** usage.delta 事实（CLI 侧 model_request_completed 的协议投影）在 host 侧的 sink 输入。 */
@@ -56,10 +60,16 @@ export const IUsageLedgerService = createServiceDescriptor<IUsageLedgerService>(
 /** 账本写入的串行队列：usage.delta 到达顺序即落库顺序（懒初始化是异步的，不能并发抢跑）。 */
 type AppendTask = Promise<unknown>;
 
-export function createUsageLedgerService(options?: {
+// BYOK fork 白屏修复：store 改为懒加载（函数体内动态 import），确保本模块被 renderer
+// 经 accessor type import 时不会在模块加载期拉入 node:fs/node:os 依赖。
+export async function createUsageLedgerService(options?: {
   /** 测试注入临时库路径；生产缺省 ~/.zcode/v2/usage-ledger.sqlite。 */
   dbPath?: string;
-}): IUsageLedgerService & { close(): void } {
+}): Promise<IUsageLedgerService & { close(): void }> {
+  const [{ UsageLedgerStore }, { createServiceLogger }] = await Promise.all([
+    import("./usageLedgerStore.js"),
+    import("../logger/serviceLogger.js"),
+  ]);
   const store = new UsageLedgerStore(options?.dbPath);
   const logger = createServiceLogger("usage-ledger");
   let appendQueue: AppendTask = Promise.resolve();

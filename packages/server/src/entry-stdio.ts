@@ -66,7 +66,7 @@ async function main() {
     content: readBundledZCodeBuiltinProviderConfig(),
   });
   await migrateApplicationStorage(await createSettingService().get());
-  const { authorityModeParseResult, services } = createStdioServices({
+  const { authorityModeParseResult, services } = await createStdioServices({
     env: process.env,
     zcodeBuiltinProviderConfigFilePath,
     topicResourceRelayChannel: () => {

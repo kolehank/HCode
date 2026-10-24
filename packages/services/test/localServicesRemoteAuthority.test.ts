@@ -117,7 +117,7 @@ describe("createLocalServices remote authority", () => {
 
     const [{ createLocalServices, disposeServiceResources }, { IModelSelectionService }] =
       await Promise.all([import("../src/node.js"), import("../src/index.js")]);
-    const services = createLocalServices({
+    const services = await createLocalServices({
       zcodeBuiltinProviderConfigFilePath: writeZCodeBuiltinProviderConfig(home),
       serviceAuthorityMode: "desktop-attached-remote",
     });
@@ -141,7 +141,7 @@ describe("createLocalServices remote authority", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(fetchImpl);
 
     const { createLocalServices, disposeServiceResources } = await import("../src/node.js");
-    const services = createLocalServices({
+    const services = await createLocalServices({
       zcodeBuiltinProviderConfigFilePath: writeZCodeBuiltinProviderConfig(home),
       serviceAuthorityMode: "desktop-attached-remote",
     });
@@ -171,7 +171,7 @@ describe("createLocalServices remote authority", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(fetchImpl);
 
     const { createLocalServices, disposeServiceResources } = await import("../src/node.js");
-    const services = createLocalServices({ zcodeBuiltinProviderConfigFilePath });
+    const services = await createLocalServices({ zcodeBuiltinProviderConfigFilePath });
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -190,7 +190,7 @@ describe("createLocalServices remote authority", () => {
     const commandResolver = vi.fn(() => null);
     const [{ createLocalServices, disposeServiceResources }, { IZCodeAgentService }] =
       await Promise.all([import("../src/node.js"), import("../src/index.js")]);
-    const services = createLocalServices({
+    const services = await createLocalServices({
       zcodeBuiltinProviderConfigFilePath,
       serviceAuthorityMode: "desktop-attached-remote",
       zcodeAgentCommandResolver: commandResolver,
@@ -211,11 +211,11 @@ describe("createLocalServices remote authority", () => {
     process.env.HOME = home;
     const { createLocalServices, disposeServiceResources } = await import("../src/node.js");
     const { IProviderProvisioningTargetService } = await import("../src/index.js");
-    const remoteServices = createLocalServices({
+    const remoteServices = await createLocalServices({
       zcodeBuiltinProviderConfigFilePath: writeZCodeBuiltinProviderConfig(home),
       serviceAuthorityMode: "desktop-attached-remote",
     });
-    const localServices = createLocalServices({
+    const localServices = await createLocalServices({
       zcodeBuiltinProviderConfigFilePath: writeZCodeBuiltinProviderConfig(home),
       serviceAuthorityMode: "desktop-local",
     });
@@ -236,7 +236,7 @@ describe("createLocalServices remote authority", () => {
     const onProviderProvisioningSourceChanged = vi.fn();
     const [{ createLocalServices, disposeServiceResources }, serviceDescriptors] =
       await Promise.all([import("../src/node.js"), import("../src/index.js")]);
-    const services = createLocalServices({
+    const services = await createLocalServices({
       zcodeBuiltinProviderConfigFilePath: writeZCodeBuiltinProviderConfig(home),
       onProviderProvisioningSourceChanged,
     });
@@ -301,7 +301,7 @@ describe("createLocalServices remote authority", () => {
       getOffPeakRequestAuthBuilder,
     } = await import("../src/node.js");
     const { ISettingService } = await import("../src/index.js");
-    const services = createLocalServices({
+    const services = await createLocalServices({
       zcodeBuiltinProviderConfigFilePath: writeZCodeBuiltinProviderConfig(home),
       serviceAuthorityMode: "desktop-attached-remote",
       hostApiNetworkTransport: {
@@ -344,7 +344,7 @@ describe("createLocalServices remote authority", () => {
     };
     const [{ createLocalServices, disposeServiceResources }, { IClientScenesService }] =
       await Promise.all([import("../src/node.js"), import("../src/index.js")]);
-    const services = createLocalServices({
+    const services = await createLocalServices({
       hostApiNetworkTransport: transport,
       serviceAuthorityMode: "desktop-attached-remote",
       // BYOK fork：P1b 内置 provider 配置改为必须提供 bundled 配置文件，与其他用例一致。
@@ -369,7 +369,7 @@ describe("createLocalServices remote authority", () => {
     process.env.HOME = home;
     const [{ createLocalServices, disposeServiceResources }, { IPluginSyncService }] =
       await Promise.all([import("../src/node.js"), import("../src/index.js")]);
-    const services = createLocalServices({
+    const services = await createLocalServices({
       zcodeBuiltinProviderConfigFilePath: writeZCodeBuiltinProviderConfig(home),
       serviceAuthorityMode: "desktop-attached-remote",
     });

@@ -1089,7 +1089,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * @param options.parentPort - Electron host process 的 parentPort，
  *        用于 BroadcastService 跨窗口中转。传 null 则广播为空操作。
  */
-export function createLocalServices(options: {
+export async function createLocalServices(options: {
   /** 已鉴权 Desktop stdio 连接提供的私有回查频道；不作为公共 service 暴露。 */
   topicResourceRelayChannel?: (request: unknown) => IChannel;
   parentPort?: Parameters<typeof createBroadcastService>[0];
@@ -1198,7 +1198,7 @@ export function createLocalServices(options: {
   };
   /** Windows desktop-local Host 的 CUA turn 状态投影；其它 authority 会在装配层拒绝。 */
   cuaOperationStateReporter?: CuaOperationStateReporter;
-}): ServiceCollection {
+}): Promise<ServiceCollection> {
   const isDesktopAttachedRemote = options?.serviceAuthorityMode === "desktop-attached-remote";
   // host / remote server 以前直接沿用当前进程环境启动后续服务。
   // GUI 启动的 desktop、SSH/WSL/Docker 拉起的 remote server 往往拿不到用户 login shell 里的 PATH，
@@ -2040,7 +2040,8 @@ export function createLocalServices(options: {
   });
   // BYOK fork P5：本地 token 用量账本（usage-ledger.sqlite）——旁路 sink 接在
   // usage.delta 事实上，纯本地落盘，不参与任何上报；close 进 dispose 链。
-  const usageLedgerService = createUsageLedgerService();
+  // BYOK fork 白屏修复：工厂改异步（store 懒加载，避免 renderer bundle 顶层 homedir 崩溃）。
+  const usageLedgerService = await createUsageLedgerService();
   const zcodeAgentService = createZCodeAgentService({
     onConversationUsageDeltaFact: (event) => usageLedgerService.recordUsageDelta(event),
     prepareProjectExecution,
@@ -2710,7 +2711,7 @@ export async function createServerHostServices(options: {
     },
   });
   const migrationFailedPathCount = await workspaceAliasRepo.getFailedPathCount();
-  const services = createLocalServices({
+  const services = await createLocalServices({
     zcodeBuiltinProviderConfigFilePath: options.zcodeBuiltinProviderConfigFilePath,
     providerProvisioningTargetEnabled: options.providerProvisioningTargetEnabled,
     serviceAuthorityMode: "standalone-server",

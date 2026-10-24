@@ -43,7 +43,7 @@ describe("telemetry service registration", () => {
       import("../src/descriptors.js"),
     ]);
 
-    const services = createLocalServices({
+    const services = await createLocalServices({
       zcodeBuiltinProviderConfigFilePath: resolve(
         import.meta.dirname,
         "../../../config/provider/zcode-builtin.json",

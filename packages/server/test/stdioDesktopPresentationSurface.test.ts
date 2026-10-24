@@ -185,7 +185,7 @@ describe("stdio Desktop presentation surface", () => {
       // 集成测试只验证入口装配与最终命令，不启动长驻 Agent 子进程。
       return null;
     });
-    const bootstrap = createStdioServices({
+    const bootstrap = await createStdioServices({
       env: {
         [SERVICE_AUTHORITY_MODE_ENV]: "desktop-attached-remote",
       },

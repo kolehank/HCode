@@ -3639,8 +3639,8 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
         const services = await initializeHostApiNetworkTransportOwner({
           transport: hostApiNetworkTransport,
           log: (message, details) => logger.warn(message, details),
-          establishOwner: () => {
-            const initializedServices = createLocalServices({
+          establishOwner: async () => {
+            const initializedServices = await createLocalServices({
               reportPluginTelemetryEvent: (event) => {
                 parentPort?.postMessage({
                   type: HostResponseTypes.PluginTelemetry,
