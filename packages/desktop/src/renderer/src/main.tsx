@@ -370,6 +370,29 @@ function initializeBusinessRoot(port: MessagePort): void {
 }
 
 window.addEventListener("message", handleServicePortMessage);
+
+// BYOK fork：renderer 白屏取证——未捕获异常/unhandled rejection 转发 main 日志落盘。
+// Windows 真机出现过界面不渲染但 main/host 日志全绿的情况；renderer console 无处可看，
+// 这里把崩溃栈送进 main 的 logger（preload 的 log 通道），下次日志即可定位根因。
+if (typeof window !== "undefined" && window.zcode?.log) {
+  const forwardRendererError = (kind: string, detail: unknown) => {
+    try {
+      const message =
+        detail instanceof Error
+          ? `${detail.name}: ${detail.message}\n${detail.stack ?? ""}`
+          : String(detail);
+      window.zcode.log("error", [`[renderer-crash] ${kind} ${message}`]);
+    } catch {
+      /* 取证本身绝不能再抛 */
+    }
+  };
+  window.addEventListener("error", (event) =>
+    forwardRendererError("uncaught", event.error ?? event.message),
+  );
+  window.addEventListener("unhandledrejection", (event) =>
+    forwardRendererError("unhandledrejection", event.reason),
+  );
+}
 if (windowKind !== "update-status") {
   renderDatabaseStartup();
   sendStartupControl({ action: "snapshot" });
