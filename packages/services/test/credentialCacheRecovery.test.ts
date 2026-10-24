@@ -4,6 +4,13 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { atomicWritePrivateTextFile, withFileLock } from "@zcode/shared/node";
 import { createCredentialService } from "#src/credential/credentialService.js";
+import { createCredentialCipherProvider } from "#src/credential/providers/credentialCipherProvider.js";
+
+// BYOK fork P2：CI Linux runner 无 secret-tool（keychain 不可用按设计 fail-closed）；
+// 本测试关注缓存恢复原子性而非密钥来源，注入显式 secret 的同步 cipher。
+const testCipher = createCredentialCipherProvider({
+  env: { ZCODE_CREDENTIAL_SECRET: "test-cache-recovery-secret" },
+});
 import { setDataBaseDir } from "#src/paths.js";
 
 const key = "project-key-location:v1:synthetic-scope";
@@ -30,7 +37,7 @@ afterEach(async () => {
 
 async function fixture() {
   const onDidMutate = vi.fn();
-  const service = createCredentialService({ onDidMutate });
+  const service = createCredentialService({ onDidMutate, cipherProvider: testCipher });
   await service.save("oauth:active_provider", "bigmodel");
   await service.save("oauth:bigmodel:access_token", "valid-login");
   await service.save("bot:test:credential", "independent");
@@ -44,7 +51,7 @@ async function fixture() {
 describe("本地缓存恢复的原子边界", () => {
   it("两个实例并发只删除一次坏缓存，OAuth 和独立凭据逐字节保留", async () => {
     const f = await fixture();
-    const other = createCredentialService({ onDidMutate: f.onDidMutate });
+    const other = createCredentialService({ onDidMutate: f.onDidMutate, cipherProvider: testCipher });
     expect(
       await Promise.all([
         f.service.recoverUnreadable(key, () => {}),
@@ -78,7 +85,7 @@ describe("本地缓存恢复的原子边界", () => {
 
   it("另一实例提交新登录并修复位置后，旧恢复不修改任何记录", async () => {
     const f = await fixture();
-    const other = createCredentialService();
+    const other = createCredentialService({ cipherProvider: testCipher });
     await other.save("oauth:bigmodel:access_token", "new-login");
     await other.save(key, location);
     const before = await readFile(file, "utf8");
