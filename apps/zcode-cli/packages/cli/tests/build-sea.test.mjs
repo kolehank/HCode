@@ -89,11 +89,12 @@ test("includes the production ZCode Built-in Provider Config as a SEA asset", as
   const zcodeBuiltinFilePath = assets[SEA_ZCODE_BUILTIN_PROVIDER_CONFIG_ASSET_KEY];
 
   assert.ok(zcodeBuiltinFilePath);
+  // BYOK fork P1b：内置 Provider 配置源切换为 byok-builtin.json，SEA 资产对照同一文件。
   assert.deepEqual(
     JSON.parse(await readFile(zcodeBuiltinFilePath, "utf8")),
     JSON.parse(
       await readFile(
-        new URL("../../../../../config/provider/zcode-builtin.json", import.meta.url),
+        new URL("../../../../../config/provider/byok-builtin.json", import.meta.url),
         "utf8",
       ),
     ),

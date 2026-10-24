@@ -66,47 +66,8 @@ describe("套餐切换建议", () => {
     expect(await prepareAccountConnectionSwitch(services as never, event)).toBeNull();
     expect(services.settingService.update).not.toHaveBeenCalled();
   });
-  it("Team 建议校验具体项目，点击不改成别的 Team", async () => {
-    const { services, event, view } = fixture();
-    view.providers[1]!.accountState.availability = "unavailable";
-    services.codingPlanSubscriptionService.getEnterprisePricing.mockResolvedValue({
-      productList: [
-        {
-          productId: "product",
-          subscribed: true,
-          teamProjects: [
-            { organizationId: "org-a", projectId: "project-a", organizationName: "团队 A" },
-            { organizationId: "org-b", projectId: "project-b", organizationName: "团队 B" },
-          ],
-        },
-      ],
-    } as never);
-    services.usageStatsService.getEntitlementSnapshot.mockImplementation(
-      async ({ accountAccess }) =>
-        accountAccess.projectId === "project-b"
-          ? {
-              subscription: {
-                identityType: "unknown",
-                identityMasked: null,
-                details: [{ productId: "product", productName: "团队 B" }],
-              },
-            }
-          : { unavailableReason: "no_plan" },
-    );
-    const suggestion = await prepareAccountConnectionSwitch(services as never, event);
-    expect(suggestion?.label).toBe("团队 B");
-    expect(suggestion?.selection).toEqual({
-      kind: "team-coding-plan",
-      productId: "product",
-      organizationId: "org-b",
-      projectId: "project-b",
-    });
-    services.usageStatsService.getEntitlementSnapshot.mockResolvedValue({
-      unavailableReason: "no_plan",
-    });
-    expect(await suggestion?.apply()).toBe("stale");
-    expect(services.settingService.update).not.toHaveBeenCalled();
-  });
+  // BYOK fork P1a：Team 切换建议依赖 usage-stats 远端权益事实，已删；
+  // isAvailable 对 team-coding-plan 恒 false，「Team 建议校验具体项目」用例移除。
   it("相同身份重选产生新版操作后，旧失效建议不能提交", async () => {
     const { services, event } = fixture();
     const suggestion = await prepareAccountConnectionSwitch(services as never, event);

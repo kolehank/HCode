@@ -246,29 +246,9 @@ describe("v4 queue edit extraction", () => {
     });
   });
 
-  it("旧 Highspeed 队列项撤回编辑时不得把临时 Provider 恢复到 Composer", () => {
-    const snapshot = makeSnapshot();
-    Object.assign(snapshot.queue.items[0]!, {
-      highspeed: {
-        schemaVersion: 1,
-        cardId: "card-1",
-        taskId: "session-1",
-        provider: "bigmodel",
-        model: "GLM-5.3",
-        issuedAt: 1,
-        expiresAt: Date.now() + 60_000,
-      },
-      mode: "yolo",
-      modelSelection: {
-        providerId: "account:bigmodel-highspeed-card",
-        modelId: "GLM-5.3",
-      },
-    });
-
-    expect(resolveQueuedComposerRestore(snapshot, "q-1")?.config).toEqual({ mode: "yolo" });
-  });
-
-  it("旧队列项只带临时 Provider、不带卡元数据时，撤回编辑同样不得恢复该 Provider", () => {
+  // BYOK fork P1d：highspeed 删除后不再过滤旧 Highspeed 队列项的 modelSelection，
+  // 撤回编辑按队列事实原样恢复（含历史临时 Provider 记录）。
+  it("旧 Highspeed 队列项撤回编辑时按队列事实原样恢复 modelSelection", () => {
     const snapshot = makeSnapshot();
     Object.assign(snapshot.queue.items[0]!, {
       mode: "yolo",
@@ -278,7 +258,13 @@ describe("v4 queue edit extraction", () => {
       },
     });
 
-    expect(resolveQueuedComposerRestore(snapshot, "q-1")?.config).toEqual({ mode: "yolo" });
+    expect(resolveQueuedComposerRestore(snapshot, "q-1")?.config).toEqual({
+      mode: "yolo",
+      modelSelection: {
+        providerId: "account:bigmodel-highspeed-card",
+        modelId: "GLM-5.3",
+      },
+    });
   });
 
   it("提取完整输入并保持附件顺序，供权威删除后恢复 composer", () => {

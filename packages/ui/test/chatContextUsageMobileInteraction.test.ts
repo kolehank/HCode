@@ -74,37 +74,8 @@ describe("ChatContextUsage mobile interaction", () => {
     expect(screen.getByText("chat.contextUsage.title")).toBeTruthy();
   });
 
-  it("refreshes plan usage through the normal open handler on touch", () => {
-    const onAccess = vi.fn();
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query === "(hover: none)",
-      media: query,
-    }));
-
-    render(
-      createElement(ChatContextUsage, {
-        intl: {
-          formatMessage: ({ id }: { id: string }) => id,
-        } as never,
-        locale: "en-US",
-        selectedProvider: "glm",
-        startPlanBalance: {
-          loading: false,
-          onAccess,
-          snapshot: null,
-        },
-        taskUsage: null,
-      }),
-    );
-
-    const trigger = screen.getByRole("button", {
-      name: "settings.modelProvider.startPlan.balance.title",
-    });
-    fireEvent.pointerDown(trigger, { pointerType: "touch" });
-
-    expect(onAccess).toHaveBeenCalledTimes(1);
-  });
-
+  // BYOK fork P1a：Start Plan 余额触发器（settings.modelProvider.startPlan.balance.title）
+  // 随 usage-stats 面板删除，「touch 刷新套餐用量」用例移除。
   it("keeps a desktop pointer from changing the hover card contract", () => {
     vi.stubGlobal("matchMedia", (query: string) => ({
       matches: false,

@@ -2,11 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ChannelClient, ChannelServer, createQueuePair } from "@zcode/rpc";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { BUILTIN_MODEL_PROVIDER_IDS } from "@zcode/shared";
-import { accountProviderCredentialKey } from "../src/model-provider/accountProviderCredentialKey.js";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const originalHome = process.env.HOME;
+const originalCredentialSecret = process.env.ZCODE_CREDENTIAL_SECRET;
 const tempHomes: string[] = [];
 const RETIRED_ZAPI_PROVIDER_ID = "builtin:zapi";
 
@@ -77,8 +76,17 @@ function writeZCodeBuiltinProviderConfig(home: string): string {
 }
 
 describe("createLocalServices remote authority", () => {
+  beforeAll(() => {
+    // BYOK fork：P2 主密钥默认走 OS keychain（测试进程会弹钥匙串授权），
+    // 统一用显式覆盖的 ZCODE_CREDENTIAL_SECRET 保证单测确定性与 CI 可运行。
+    process.env.ZCODE_CREDENTIAL_SECRET = originalCredentialSecret ?? "test-credential-secret";
+  });
+
   afterEach(() => {
     process.env.HOME = originalHome;
+    // BYOK fork：P2 主密钥默认走 OS keychain（测试进程会弹钥匙串授权），
+    // 统一用显式覆盖的 ZCODE_CREDENTIAL_SECRET 保证单测确定性。
+    process.env.ZCODE_CREDENTIAL_SECRET = originalCredentialSecret ?? "test-credential-secret";
     vi.restoreAllMocks();
     vi.resetModules();
     for (const home of tempHomes.splice(0)) {
@@ -253,7 +261,7 @@ describe("createLocalServices remote authority", () => {
       expect(onProviderProvisioningSourceChanged.mock.calls).toEqual([
         ["personal-config"],
         ["account-settings"],
-        ["credential"],
+        // BYOK fork P1b：OAuth 登录删除后，凭据变更不再触发 provisioning "credential" 通知。
       ]);
     } finally {
       disposeServiceResources(services);
@@ -292,7 +300,7 @@ describe("createLocalServices remote authority", () => {
       getAccountRequestAuthService,
       getOffPeakRequestAuthBuilder,
     } = await import("../src/node.js");
-    const { ICredentialService, ISettingService } = await import("../src/index.js");
+    const { ISettingService } = await import("../src/index.js");
     const services = createLocalServices({
       zcodeBuiltinProviderConfigFilePath: writeZCodeBuiltinProviderConfig(home),
       serviceAuthorityMode: "desktop-attached-remote",
@@ -313,60 +321,8 @@ describe("createLocalServices remote authority", () => {
       services.exposeOnChannelServer({ registerChannel });
       expect(registerChannel).toHaveBeenCalled();
       expect(exposeService).not.toHaveBeenCalledWith(accountRequestAuthService);
-      const credentialService = services.get(ICredentialService);
-      const before = await services.get(ISettingService).get();
-      await services.get(ISettingService).update(
-        {
-          providerFamilyDomain: "zai",
-          providerFamilyConnectionSelections: {
-            zai: { kind: "individual-coding-plan" },
-          },
-        },
-        {
-          providerFamilyDomain: before.providerFamilyDomain,
-          providerFamilyConnectionSelections: before.providerFamilyConnectionSelections,
-          providerFamilyDomainUpdatedAt: before.providerFamilyDomainUpdatedAt ?? 0,
-        },
-      );
-      await credentialService.save(
-        "oauth:zai:user_info",
-        JSON.stringify({ id: "account-a", username: "a", displayName: "Account A" }),
-      );
-      await credentialService.save("oauth:zai:access_token", "login-token");
-      // OAuth 只用登录态换 PAT；保留旧 Key 作为反例，防止组装退回历史 Secret。
-      await credentialService.save(
-        accountProviderCredentialKey({
-          providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-          planKind: "individual-coding-plan",
-          accountIdentity: "account-a",
-        }),
-        "legacy-coding-plan-key",
-      );
-
-      await expect(
-        accountRequestAuthService!.resolveCurrent({
-          providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-          modelId: "glm-5",
-          accountAccess: {
-            type: "zhipu-account",
-            family: "zai",
-            planKind: "individual-coding-plan",
-          },
-          reason: "model-request",
-        }),
-      ).resolves.toEqual({
-        apiKey: "current-project-token",
-        apiKeyId: "key-id",
-        accountScope: expect.stringMatching(/^[a-f0-9]{64}$/),
-      });
-      const tokenRequest = fetchToken.mock.calls.find(([url]) =>
-        String(url).endsWith("/api_keys/key-id/access_tokens"),
-      );
-      expect(tokenRequest).toBeDefined();
-      expect(new Headers(tokenRequest![1]?.headers).get("authorization")).toBe(
-        "Bearer login-token",
-      );
-      expect(fetchToken.mock.calls.some(([url]) => String(url).includes("/copy/"))).toBe(false);
+      // BYOK fork P1b：OAuth 登录态删除后 loadOAuthTokenSet 恒为 null，基于登录态换 PAT 的
+      // resolveCurrent 路径已不存在；以下 OAuth 凭据保存与 PAT 断言属于已删行为，予以移除。
     } finally {
       disposeServiceResources(services);
     }
@@ -391,6 +347,8 @@ describe("createLocalServices remote authority", () => {
     const services = createLocalServices({
       hostApiNetworkTransport: transport,
       serviceAuthorityMode: "desktop-attached-remote",
+      // BYOK fork：P1b 内置 provider 配置改为必须提供 bundled 配置文件，与其他用例一致。
+      zcodeBuiltinProviderConfigFilePath: writeZCodeBuiltinProviderConfig(home),
     });
 
     try {

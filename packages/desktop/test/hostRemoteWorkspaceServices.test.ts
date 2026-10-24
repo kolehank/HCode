@@ -1,12 +1,9 @@
 import { Emitter, ChannelClient, ChannelServer, createQueuePair, ProxyChannel } from "@zcode/rpc";
 import { describe, expect, it, vi } from "vitest";
 import {
-  IClientConfigService,
   IFileService,
   IMediaPreviewService,
   ICredentialService,
-  IOAuthService,
-  ICodingPlanSubscriptionService,
   ISettingService,
   IOnboardingRecordService,
   ISystemService,
@@ -35,8 +32,6 @@ import {
   createSourceSettingsServiceCollection,
   shouldDetachSourceSettingsAttachment,
 } from "../src/host/sourceSettingsServiceCollection.js";
-
-const clientConfigService = { getSnapshot: vi.fn(async () => ({ pluginStoreOrder: null })) };
 
 function makeServerRemoteServices(): IServiceAccessor {
   return {
@@ -92,7 +87,6 @@ describe("server remote workspace host service wiring", () => {
       };
       const remoteServices = { ...makeServerRemoteServices(), broadcastService: sourceBroadcast };
       const services = createServerRemoteWorkspaceServiceCollection({
-        clientConfigService,
         targetKind,
         connectionServices: remoteServices,
         sourceServices: new ServiceCollection()
@@ -128,10 +122,7 @@ describe("server remote workspace host service wiring", () => {
     const services = createSourceSettingsServiceCollection(remoteServices);
 
     expect(services.get(ICredentialService)).toBe(remoteServices.credentialService);
-    expect(services.get(IOAuthService)).toBe(remoteServices.oauthService);
-    expect(services.get(ICodingPlanSubscriptionService)).toBe(
-      remoteServices.codingPlanSubscriptionService,
-    );
+    // BYOK fork：IOAuthService/ICodingPlanSubscriptionService 随 OAuth（P1b）与厂商订阅（P1a）删除，不再转发。
     expect(services.get(ISettingService)).toBe(remoteServices.settingService);
     expect(services.get(ISystemService)).toBe(remoteServices.systemService);
     expect(services.get(IPluginSyncService)).toBe(remoteServices.pluginSyncService);
@@ -148,12 +139,11 @@ describe("server remote workspace host service wiring", () => {
   it("keeps the Source Server runtime authoritative for every forwarded service family", () => {
     const remoteServices = makeServerRemoteServices();
     const services = createServerRemoteWorkspaceServiceCollection({
-      clientConfigService,
       targetKind: "server",
       connectionServices: remoteServices,
     });
 
-    expect(services.get(IClientConfigService)).toBe(clientConfigService);
+    // BYOK fork：IClientConfigService（厂商远端配置）随 P1a 删除，不再由 Host 注册。
     expect(services.get(IFileService)).toBe(remoteServices.fileService);
     expect(services.get(IMediaPreviewService)).toBe(remoteServices.mediaPreviewService);
     expect(services.get(ISettingService)).toBe(remoteServices.settingService);
@@ -176,7 +166,6 @@ describe("server remote workspace host service wiring", () => {
       const localRecord = createOnboardingRecordStub();
       const sourceRecord = createOnboardingRecordStub();
       const services = createServerRemoteWorkspaceServiceCollection({
-        clientConfigService,
         targetKind,
         connectionServices: {
           ...makeServerRemoteServices(),
@@ -336,7 +325,6 @@ describe("server remote workspace host service wiring", () => {
       providerProvisioningTargetService: { apply: remoteTargetApply },
     });
     const services = createServerRemoteWorkspaceServiceCollection({
-      clientConfigService,
       targetKind: "server",
       connectionServices: remoteServices,
     });

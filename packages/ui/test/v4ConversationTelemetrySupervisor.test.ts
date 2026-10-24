@@ -492,26 +492,13 @@ describe("ConversationTelemetrySupervisor", () => {
         );
         // ARMS 侧复用同一份 legacy detail：内置 provider 的旧报表身份必须保留、模型按白名单规范化，
         // 否则内置用户在 plan_ttft / perf_ui_* 看板里会整体落入 custom。
-        expect(armsByName(reportArmsCustomEvent, "plan_ttft")[0]?.properties).toMatchObject({
-          provider_id: `builtin:${family}-start-plan`,
-          provider_scope: "builtin",
-          model_name: "glm-5.3",
-        });
+        // BYOK fork P1a：plan_ttft / plan_request 上报已 no-op（planUsageArmsTelemetry 删除），
+        // 仅保留 perf_ui_*（本地 UI perf 链路仍在）与 plan_* 不上报的断言。
+        expect(armsByName(reportArmsCustomEvent, "plan_ttft")).toHaveLength(0);
         expect(armsByName(reportArmsCustomEvent, "perf_ui_first_token")[0]?.properties?.model).toBe(
           "glm-5.3",
         );
-        // plan_request 直接使用协议事件里的 provider（account:* 或旧 builtin:*），两种命名空间都应保留。
-        const planRequests = armsByName(reportArmsCustomEvent, "plan_request");
-        expect(planRequests.map((payload) => payload.properties?.provider_id)).toEqual([
-          team,
-          start,
-        ]);
-        for (const payload of planRequests) {
-          expect(payload.properties).toMatchObject({
-            provider_scope: "builtin",
-            model_name: "glm-5.3",
-          });
-        }
+        expect(armsByName(reportArmsCustomEvent, "plan_request")).toHaveLength(0);
         detach();
         supervisor.dispose();
         return reports;
@@ -807,7 +794,8 @@ describe("ConversationTelemetrySupervisor", () => {
       },
     });
     expect(reportsByElement(reportTelemetryEvent, "agent_step")).toHaveLength(3);
-    expect(armsByName(reportArmsCustomEvent, "plan_request")).toHaveLength(1);
+    // BYOK fork P1a：plan_request 上报已 no-op（planUsageArmsTelemetry 删除）。
+    expect(armsByName(reportArmsCustomEvent, "plan_request")).toHaveLength(0);
     expect(armsByName(reportArmsCustomEvent, "perf_ui_tool_call_detail")[0]).toMatchObject({
       properties: {
         tool_call_id: "tool-1",
@@ -819,7 +807,8 @@ describe("ConversationTelemetrySupervisor", () => {
       },
     });
     expect(armsByName(reportArmsCustomEvent, "perf_ui_first_token")[0]?.value).toBe(50);
-    expect(armsByName(reportArmsCustomEvent, "plan_ttft")[0]?.value).toBe(50);
+    // BYOK fork P1a：plan_ttft 上报已 no-op。
+    expect(armsByName(reportArmsCustomEvent, "plan_ttft")).toHaveLength(0);
     expect(armsByName(reportArmsCustomEvent, "perf_ui_message_complete")[0]?.value).toBe(6_800);
     expect(armsByName(reportArmsCustomEvent, "perf_ui_turn_breakdown")[0]).toMatchObject({
       value: 6_800,
@@ -2915,9 +2904,8 @@ describe("ConversationTelemetrySupervisor", () => {
     expect(reportsByElement(reportTelemetryEvent, "send_btn")).toHaveLength(1);
     expect(reportsByElement(reportTelemetryEvent, "message_completion")).toHaveLength(1);
     expect(reportsByElement(reportTelemetryEvent, "agent_step")).toHaveLength(1);
-    expect(reportArmsCustomEvent.mock.calls.map(([payload]) => payload.name)).toEqual([
-      "plan_request",
-    ]);
+    // BYOK fork P1a：plan_request 上报已 no-op，background 不再产生任何 ARMS 事件。
+    expect(reportArmsCustomEvent.mock.calls.map(([payload]) => payload.name)).toEqual([]);
     supervisor.dispose();
   });
 
@@ -3722,11 +3710,8 @@ describe("ConversationTelemetrySupervisor", () => {
         maxAttempts: 3,
       });
     });
-    expect(
-      armsByName(reportArmsCustomEvent, "plan_request").map(
-        (payload) => payload.properties?.request_status,
-      ),
-    ).toEqual(["started", "completed", "failed", "retry_scheduled", "stream_stalled"]);
+    // BYOK fork P1a：plan_request 上报已 no-op，五态仅进入 supervisor 去重边界。
+    expect(armsByName(reportArmsCustomEvent, "plan_request")).toHaveLength(0);
 
     const compaction = {
       ...commonFact("compact-1", 20, "session-compact"),
@@ -3855,7 +3840,8 @@ describe("ConversationTelemetrySupervisor", () => {
       status: "success",
     });
     expect(armsByName(reportArmsCustomEvent, "perf_ui_first_token")[0]?.value).toBe(40);
-    expect(armsByName(reportArmsCustomEvent, "plan_ttft")[0]?.value).toBe(40);
+    // BYOK fork P1a：plan_ttft 上报已 no-op。
+    expect(armsByName(reportArmsCustomEvent, "plan_ttft")).toHaveLength(0);
 
     supervisor.acceptPromptSeed({
       sessionId: "session-2",
@@ -3881,7 +3867,8 @@ describe("ConversationTelemetrySupervisor", () => {
     expect(
       armsByName(reportArmsCustomEvent, "perf_ui_first_token").map((item) => item.value),
     ).toEqual([40, 0]);
-    expect(armsByName(reportArmsCustomEvent, "plan_ttft")).toHaveLength(1);
+    // BYOK fork P1a：plan_ttft 上报已 no-op，无 token terminal 同样不产生。
+    expect(armsByName(reportArmsCustomEvent, "plan_ttft")).toHaveLength(0);
     supervisor.dispose();
   });
 
@@ -3930,7 +3917,8 @@ describe("ConversationTelemetrySupervisor", () => {
     expect(reportsByElement(reportTelemetryEvent, "agent_step")).toHaveLength(0);
     expect(armsByName(reportArmsCustomEvent, "perf_ui_stream_stall")[0]?.value).toBe(3_101);
     expect(armsByName(reportArmsCustomEvent, "perf_ui_first_token")[0]?.value).toBe(50);
-    expect(armsByName(reportArmsCustomEvent, "plan_ttft")[0]?.value).toBe(50);
+    // BYOK fork P1a：plan_ttft 上报已 no-op。
+    expect(armsByName(reportArmsCustomEvent, "plan_ttft")).toHaveLength(0);
     supervisor.dispose();
   });
 
@@ -3969,7 +3957,8 @@ describe("ConversationTelemetrySupervisor", () => {
     await supervisor.flushReportsForTest();
     expect(reportsByElement(reportTelemetryEvent, "agent_step")).toHaveLength(1);
     expect(armsByName(reportArmsCustomEvent, "perf_ui_first_token")[0]?.value).toBe(50);
-    expect(armsByName(reportArmsCustomEvent, "plan_ttft")[0]?.value).toBe(50);
+    // BYOK fork P1a：plan_ttft 上报已 no-op。
+    expect(armsByName(reportArmsCustomEvent, "plan_ttft")).toHaveLength(0);
     supervisor.dispose();
   });
 

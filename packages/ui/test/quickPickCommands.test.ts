@@ -85,7 +85,7 @@ describe("createQuickPickCommands", () => {
       "feedback",
       "community",
       "product-docs",
-      "login",
+      // BYOK fork P1b：未登录时的「login」命令随 OAuth 登录入口删除。
     ]);
     expect(commands.find((command) => command.id === "open-workspace")).toMatchObject({
       sectionId: "suggested",

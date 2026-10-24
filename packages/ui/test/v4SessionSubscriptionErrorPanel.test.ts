@@ -64,26 +64,14 @@ describe("SessionSubscriptionErrorPanel", () => {
     expect(screen.getByRole("button", { name: "重新连接" })).toBeTruthy();
   });
 
-  it("opens a feedback draft with the subscription error context", async () => {
+  it("反馈入口点击后不再写 feedback 草稿（厂商通道已删，仅保留入口）", async () => {
+    // BYOK fork P1a：feedback 厂商通道删除，openSubmit 为 no-op，不再写入 submitDraft。
     renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "反馈问题" }));
 
-    await waitFor(() => expect(useFeedbackStore.getState().open).toBe(true));
-    expect(useFeedbackStore.getState().submitDraft).toMatchObject({
-      title: "EPERM: operation not permitted",
-      type: "bug",
-      module: "Agent任务执行失败",
-      severity: "P2-中",
-      includeLogs: true,
-      screenshots: [],
-    });
-    expect(useFeedbackStore.getState().submitDraft?.description).toContain(
-      "报错摘要：EPERM: operation not permitted",
-    );
-    expect(useFeedbackStore.getState().submitDraft?.description).toContain("任务 ID: session-1");
-    expect(useFeedbackStore.getState().submitDraft?.description).toContain(
-      "工作区: F:\\ZCode_data",
-    );
+    await waitFor(() => expect(captureWindowScreenshot).not.toHaveBeenCalled());
+    expect(useFeedbackStore.getState().open).toBe(false);
+    expect(useFeedbackStore.getState().submitDraft).toBeNull();
   });
 });

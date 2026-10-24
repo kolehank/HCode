@@ -505,11 +505,8 @@ describe("desktopRemoteSessions R1 window Host forwarding", () => {
       activeSessionCount: 1,
       activeTargetCount: 1,
     });
-    expect(reportRemoteConnectionStateChanged).toHaveBeenCalledWith({
-      rendererId: 101,
-      remoteKind: "ssh",
-      transition: "connected",
-    });
+    // BYOK fork P0：remote-usage 遥测上报已删除，connection state 不再回调。
+    expect(reportRemoteConnectionStateChanged).not.toHaveBeenCalled();
 
     const internal = manager.createRemoteWorkspaceSession(
       win as never,
@@ -525,12 +522,15 @@ describe("desktopRemoteSessions R1 window Host forwarding", () => {
     confirmLatestScopedAttachment(manager, win);
     await internal;
 
+    // BYOK fork P0：stats 不再按 remoteUsageTelemetryEligible 过滤，
+    // internal-only 连接同样计入并发统计。
     expect(manager.getRemoteConnectionStats()).toEqual({
-      activeSessionCount: 1,
-      activeTargetCount: 1,
+      activeSessionCount: 2,
+      activeTargetCount: 2,
     });
     manager.disposeRemoteWorkspaceSession("remote-internal", "internal-finished");
-    expect(reportRemoteConnectionStateChanged).toHaveBeenCalledOnce();
+    // BYOK fork P0：internal 连接的 gauge 上报已删除。
+    expect(reportRemoteConnectionStateChanged).not.toHaveBeenCalled();
     expect(reportRemoteDisconnect).not.toHaveBeenCalled();
   });
 
@@ -569,21 +569,14 @@ describe("desktopRemoteSessions R1 window Host forwarding", () => {
       activeSessionCount: 0,
       activeTargetCount: 0,
     });
-    expect(reportRemoteConnectionStateChanged).toHaveBeenNthCalledWith(2, {
-      rendererId: 101,
-      remoteKind: "ssh",
-      transition: "connection-closed",
-    });
-    expect(reportRemoteDisconnect).toHaveBeenCalledWith({
-      rendererId: 101,
-      remoteKind: "ssh",
-      disconnectReason: "connection-closed",
-      durationMs: 500,
-    });
+    // BYOK fork P0：remote-usage 遥测上报已删除，state gauge 与 disconnect 均不再回调。
+    expect(reportRemoteConnectionStateChanged).not.toHaveBeenCalled();
+    expect(reportRemoteDisconnect).not.toHaveBeenCalled();
 
     manager.disposeRemoteWorkspaceSession("remote-session-1", "tab-closed");
-    expect(reportRemoteConnectionStateChanged).toHaveBeenCalledTimes(2);
-    expect(reportRemoteDisconnect).toHaveBeenCalledOnce();
+    expect(reportRemoteConnectionStateChanged).not.toHaveBeenCalled();
+    // BYOK fork P0：disconnect 遥测同样已删除。
+    expect(reportRemoteDisconnect).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -617,17 +610,10 @@ describe("desktopRemoteSessions R1 window Host forwarding", () => {
     else if (owner === "host") child.emit("exit");
     else await manager.disposeAllAndWaitForAppShutdown("app-quit");
 
-    expect(reportRemoteConnectionStateChanged).toHaveBeenLastCalledWith({
-      rendererId: 101,
-      remoteKind: "ssh",
-      transition: reason,
-    });
-    expect(reportRemoteDisconnect).toHaveBeenCalledWith({
-      rendererId: 101,
-      remoteKind: "ssh",
-      disconnectReason: reason,
-      durationMs: 200,
-    });
+    // BYOK fork P0：remote-usage 遥测上报已删除，终态 transition 不再回调。
+    expect(reportRemoteConnectionStateChanged).not.toHaveBeenCalled();
+    // BYOK fork P0：disconnect 遥测已删除。
+    expect(reportRemoteDisconnect).not.toHaveBeenCalled();
     expect(manager.getRemoteConnectionStats()).toEqual({
       activeSessionCount: 0,
       activeTargetCount: 0,
@@ -695,8 +681,10 @@ describe("desktopRemoteSessions R1 window Host forwarding", () => {
     expect(() =>
       manager.disposeRemoteWorkspaceSession("remote-session-1", "tab-closed"),
     ).not.toThrow();
-    expect(reportRemoteConnectionStateChanged).toHaveBeenCalledTimes(2);
-    expect(reportRemoteDisconnect).toHaveBeenCalledOnce();
+    // BYOK fork P0：remote-usage 遥测上报已删除。
+    expect(reportRemoteConnectionStateChanged).not.toHaveBeenCalled();
+    // BYOK fork P0：disconnect 遥测已删除；回调抛错路径随上报一起移除。
+    expect(reportRemoteDisconnect).not.toHaveBeenCalled();
   });
 
   it("WSL target 解析期间进入 app shutdown 后不发送迟到连接", async () => {
@@ -1230,8 +1218,9 @@ describe("desktopRemoteSessions R1 window Host forwarding", () => {
     });
 
     await expect(eligible).resolves.toBe("remote-session-1");
-    expect(reportRemoteConnectionStateChanged).toHaveBeenCalledTimes(1);
-    expect(reportRemoteConnectionStateChanged).toHaveBeenCalledWith({
+    // BYOK fork P0：遥测资格提升（reportRemoteRouteConnected）已删除，不再回调。
+    expect(reportRemoteConnectionStateChanged).not.toHaveBeenCalled();
+    expect(reportRemoteConnectionStateChanged).not.toHaveBeenCalledWith({
       rendererId: 101,
       remoteKind: "ssh",
       transition: "connected",
@@ -1344,9 +1333,10 @@ describe("desktopRemoteSessions R1 window Host forwarding", () => {
         remoteSessionId: "remote-session-1",
       }),
     );
+    // BYOK fork P0：stats 不再按 telemetry eligible 过滤，owner route 保持计入。
     expect(manager.getRemoteConnectionStats()).toEqual({
-      activeSessionCount: 0,
-      activeTargetCount: 0,
+      activeSessionCount: 1,
+      activeTargetCount: 1,
     });
     expect(manager.hasRemoteWorkspaceSessionForTarget(win as never, sshTarget)).toBe(true);
   });
@@ -1637,12 +1627,8 @@ describe("desktopRemoteSessions R1 window Host forwarding", () => {
         workspaceIdentity,
       }),
     );
-    expect(webRemoteControlManager.replaceRemoteSession).toHaveBeenCalledWith({
-      previousSessionId: "remote-session-1",
-      sessionId: "remote-session-2",
-      workspacePath,
-      workspaceIdentity,
-    });
+    // BYOK fork P3：官方中继的 replaceRemoteSession 通知已删除（手机恢复由 replayable 协议链自建）。
+    expect(webRemoteControlManager.replaceRemoteSession).not.toHaveBeenCalled();
     expect(child.postMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({
         type: HostMessageTypes.DisposeRemoteWorkspaceSession,
@@ -1658,11 +1644,8 @@ describe("desktopRemoteSessions R1 window Host forwarding", () => {
       signal: null,
       recoverable: false,
     });
-    expect(webRemoteControlManager.failRemoteSession).toHaveBeenCalledWith(
-      "remote-session-2",
-      "window-host:connection-offline",
-      expect.objectContaining({ reason: "workspace-closed" }),
-    );
+    // BYOK fork P3：官方中继的 failRemoteSession 通知已删除。
+    expect(webRemoteControlManager.failRemoteSession).not.toHaveBeenCalled();
   });
 
   async function reconnectSourceSession(params: {
@@ -1856,12 +1839,11 @@ describe("desktopRemoteSessions R1 window Host forwarding", () => {
       previousRemoteSessionId: "mobile-scope",
       descriptor: { ...remote, remoteSessionId: "mobile-reconnected", generation: 2 },
     });
+    // BYOK fork P3：官方中继的 replaceRemoteSession 通知已删除；重连后 descriptor 就位即认为交接完成。
     await vi.waitFor(() =>
-      expect(remoteControl.replaceRemoteSession).toHaveBeenCalledWith(
-        expect.objectContaining({ sessionId: "mobile-reconnected" }),
-      ),
+      expect(win.webContents.postMessage).not.toHaveBeenCalled(),
     );
-    expect(win.webContents.postMessage).not.toHaveBeenCalled();
+    expect(remoteControl.replaceRemoteSession).not.toHaveBeenCalled();
     manager.disposeRemoteWorkspaceSessionsForWindow(101);
   });
 
@@ -2056,11 +2038,8 @@ describe("mobile scope admission joins", () => {
     expect(reportRemoteConnectionStateChanged).not.toHaveBeenCalled();
     confirmLatestScopedAttachment(manager, win);
     await desktop;
-    expect(reportRemoteConnectionStateChanged).toHaveBeenCalledWith({
-      rendererId: 101,
-      remoteKind: "ssh",
-      transition: "connected",
-    });
+    // BYOK fork P0：remote-usage 遥测上报已删除，desktop adoption 也不再回调。
+    expect(reportRemoteConnectionStateChanged).not.toHaveBeenCalled();
     manager.disposeRemoteWorkspaceSessionsForWindow(101);
   });
 

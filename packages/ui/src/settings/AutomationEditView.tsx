@@ -1739,8 +1739,9 @@ export function AutomationEditView({
   // 字段才能触发未保存提示，否则仅打开已有任务再返回也会被误判为修改。
   const hasUnsavedChanges = Boolean(editing) && changedFields.length > 0;
 
-  // BYOK fork P1a：Start Plan 推荐恒 null。
-  const recommendStartPlan = async (_selection: unknown): Promise<null> => null;
+  // BYOK fork P1a：Start Plan 推荐删除。原 hook 无推荐时返回原 selection（仅用户 dismiss 才 null），
+  // stub 保持「原样透传」语义，否则提交边界 if (!chosen) return false 会拦截所有带模型选择的保存（手术误伤修复）。
+  const recommendStartPlan = async <T,>(selection: T): Promise<T> => selection;
   const submitAutomation = useCallback(
     async (options: { validationSource: "save" | "run-now"; returnToList?: boolean }) => {
       if (saving) return false;

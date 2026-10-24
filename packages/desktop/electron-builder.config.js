@@ -460,15 +460,18 @@ function assertPackagedNodePtyPrebuild(context) {
     throw new Error(`node-pty 预编译产物缺失: ${targetBinaryPath}`);
 }
 
-// BYOK A2：桌面内嵌远程访问入口需要 web 前端产物。这里在打包配置求值期就断言，
-// 比 electron-builder 对 extraResources from 的 ENOENT 报错更可执行。
-const webDistDir = resolve(workspaceRoot, "packages/web/dist");
-if (!existsSync(webDistDir)) {
-  throw new Error(
-    `[electron-builder.config] packages/web/dist 不存在：桌面安装包需要随包内置 web 前端 ` +
-      `(extraResources → resources/web-dist，供内嵌远程访问入口静态 serve)。` +
-      `请先执行 pnpm --filter @zcode/web build（CI 的 build:bootstrap 已包含该步骤）再打包。`,
-  );
+// BYOK A2：桌面内嵌远程访问入口需要 web 前端产物。原来在配置求值期断言，
+// 会让未构建 web/dist 的仓库连导入配置（如单测）都失败；改为 beforePack 打包期检查，
+// 比 electron-builder 对 extraResources from 的 ENOENT 报错更可执行，同时不阻塞测试导入。
+function assertWebDistForEmbeddedRemoteAccess() {
+  const webDistDir = resolve(workspaceRoot, "packages/web/dist");
+  if (!existsSync(webDistDir)) {
+    throw new Error(
+      `[electron-builder.config] packages/web/dist 不存在：桌面安装包需要随包内置 web 前端 ` +
+        `(extraResources → resources/web-dist，供内嵌远程访问入口静态 serve)。` +
+        `请先执行 pnpm --filter @zcode/web build（CI 的 build:bootstrap 已包含该步骤）再打包。`,
+    );
+  }
 }
 
 function assertPackagedCuaSharp(context) {
@@ -652,6 +655,12 @@ export default {
         });
       });
     }
+  },
+  beforePack: async () => {
+    await Promise.resolve();
+    runTimedSync("beforePack:assertWebDistForEmbeddedRemoteAccess", () =>
+      assertWebDistForEmbeddedRemoteAccess(),
+    );
   },
   afterExtract: async (context) => {
     // 修复：macOS 重命名阶段会删除归档顶层许可证，必须在 afterExtract 保留目标平台原文。

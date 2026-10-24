@@ -365,9 +365,10 @@ describe("buildVisibleFamilyConnectionKeys", () => {
         item.id === BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan,
     );
 
+    // BYOK fork P1b：厂商业务端点 fail-closed 为 .invalid 占位。
     expect(bigmodelSpecs.map((item) => item.purchaseUrl)).toEqual([
-      "https://bigmodel.cn/coding-plan/personal/overview",
-      "https://bigmodel.cn/coding-plan/personal/overview",
+      "https://bigmodel.invalid/coding-plan/personal/overview",
+      "https://bigmodel.invalid/coding-plan/personal/overview",
     ]);
   });
 
@@ -454,7 +455,8 @@ describe("buildVisibleFamilyConnectionKeys", () => {
     });
 
     const teamItem = items.find((item) => item.type === "teamPlan");
-    expect(teamItem?.purchaseUrl).toBe("https://bigmodel.cn/coding-plan/team/plans");
+    // BYOK fork P1b：厂商业务端点 fail-closed 为 .invalid 占位。
+    expect(teamItem?.purchaseUrl).toBe("https://bigmodel.invalid/coding-plan/team/plans");
     expect(teamItem?.teamPlanName).toBe("Org A");
     expect(teamItem?.planLevel).toBe("Org A");
   });

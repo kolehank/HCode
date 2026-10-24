@@ -248,7 +248,9 @@ describe("registerPlatformIpcHandlers", () => {
       { sender: {} },
       workspaces,
     );
-    expect(syncWebRemoteControlWorkspaces).toHaveBeenCalledWith(7, workspaces);
+    // BYOK fork：SyncWebRemoteControlWorkspaces 恢复链已随官方中继删除，
+    // 本地 tabs / 完整快照均不再触发 syncWebRemoteControlWorkspaces 回调。
+    expect(syncWebRemoteControlWorkspaces).not.toHaveBeenCalled();
   });
 
   it("runs generalized CUA permission onboarding for Screen Recording", async () => {

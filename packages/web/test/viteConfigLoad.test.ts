@@ -83,9 +83,10 @@ describe("web Vite config", () => {
     });
   });
 
+  // BYOK fork P1b：BigModel 授权域名 fail-closed 为 .invalid 占位（OAuth 登录已删）。
   it.each([
-    ["test", "https://bigmodel.cn"],
-    ["production", "https://bigmodel.cn"],
+    ["test", "https://bigmodel.invalid"],
+    ["production", "https://bigmodel.invalid"],
   ])("%s 构建向远控登录页注入对应 BigModel 授权域名", async (environment, origin) => {
     vi.stubEnv("ZCODE_ENV", environment);
     const webRoot = resolve(import.meta.dirname, "..");

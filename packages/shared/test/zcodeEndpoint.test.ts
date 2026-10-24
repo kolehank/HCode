@@ -40,7 +40,7 @@ describe("zcodeEndpoint", () => {
     expect(
       resolveZCodeEndpointOrigin({
         env: "test",
-        envBaseOrigin: "https://zcode.z.ai",
+        envBaseOrigin: "https://zcode.invalid",
         overrideOrigin: "http://localhost:3030/api/v1",
       }),
     ).toBe("http://localhost:3030");
@@ -50,7 +50,7 @@ describe("zcodeEndpoint", () => {
     expect(
       resolveZCodeEndpointOrigin({
         env: "test",
-        overrideOrigin: "https://zcode.z.ai/api/v1/ignored?x=1",
+        overrideOrigin: "https://zcode.invalid/api/v1/ignored?x=1",
       }),
     ).toBe(TEST_ZCODE_ENDPOINT_ORIGIN);
   });
@@ -59,8 +59,8 @@ describe("zcodeEndpoint", () => {
     expect(
       resolveZCodeEndpointOrigin({
         env: "production",
-        envBaseOrigin: "https://zcode.z.ai",
-        overrideOrigin: "https://zcode.z.ai",
+        envBaseOrigin: "https://zcode.invalid",
+        overrideOrigin: "https://zcode.invalid",
       }),
     ).toBe(DEFAULT_ZCODE_ENDPOINT_ORIGIN);
   });
@@ -81,57 +81,57 @@ describe("zcodeEndpoint", () => {
   });
 
   it("uses remote v3 for app versions below 3.4.0", () => {
-    expect(buildZCodeEndpointUrls("https://zcode.z.ai", { appVersion: "3.3.9" }).remoteUrl).toBe(
-      "https://zcode.z.ai/remote/v3",
+    expect(buildZCodeEndpointUrls("https://zcode.invalid", { appVersion: "3.3.9" }).remoteUrl).toBe(
+      "https://zcode.invalid/remote/v3",
     );
   });
 
   it("uses remote v4 for app versions at or above 3.4.0", () => {
-    expect(buildZCodeEndpointUrls("https://zcode.z.ai", { appVersion: "3.4.0" }).remoteUrl).toBe(
-      "https://zcode.z.ai/remote/v4",
+    expect(buildZCodeEndpointUrls("https://zcode.invalid", { appVersion: "3.4.0" }).remoteUrl).toBe(
+      "https://zcode.invalid/remote/v4",
     );
-    expect(buildZCodeEndpointUrls("https://zcode.z.ai", { appVersion: "3.4.1" }).remoteUrl).toBe(
-      "https://zcode.z.ai/remote/v4",
+    expect(buildZCodeEndpointUrls("https://zcode.invalid", { appVersion: "3.4.1" }).remoteUrl).toBe(
+      "https://zcode.invalid/remote/v4",
     );
     expect(
-      buildZCodeEndpointUrls("https://zcode.z.ai", { appVersion: "3.5.0-beta.1" }).remoteUrl,
-    ).toBe("https://zcode.z.ai/remote/v4");
+      buildZCodeEndpointUrls("https://zcode.invalid", { appVersion: "3.5.0-beta.1" }).remoteUrl,
+    ).toBe("https://zcode.invalid/remote/v4");
   });
 
   it("keeps prerelease and invalid app versions on remote v3", () => {
     expect(
-      buildZCodeEndpointUrls("https://zcode.z.ai", { appVersion: "3.4.0-beta.1" }).remoteUrl,
-    ).toBe("https://zcode.z.ai/remote/v3");
-    expect(buildZCodeEndpointUrls("https://zcode.z.ai", { appVersion: "dev" }).remoteUrl).toBe(
-      "https://zcode.z.ai/remote/v3",
+      buildZCodeEndpointUrls("https://zcode.invalid", { appVersion: "3.4.0-beta.1" }).remoteUrl,
+    ).toBe("https://zcode.invalid/remote/v3");
+    expect(buildZCodeEndpointUrls("https://zcode.invalid", { appVersion: "dev" }).remoteUrl).toBe(
+      "https://zcode.invalid/remote/v3",
     );
-    expect(buildZCodeEndpointUrls("https://zcode.z.ai", { appVersion: "03.4.0" }).remoteUrl).toBe(
-      "https://zcode.z.ai/remote/v3",
+    expect(buildZCodeEndpointUrls("https://zcode.invalid", { appVersion: "03.4.0" }).remoteUrl).toBe(
+      "https://zcode.invalid/remote/v3",
     );
     expect(
-      buildZCodeEndpointUrls("https://zcode.z.ai", { appVersion: "3.4.1-alpha..1" }).remoteUrl,
-    ).toBe("https://zcode.z.ai/remote/v3");
-    expect(buildZCodeEndpointUrls("https://zcode.z.ai", { appVersion: "3.4.1-01" }).remoteUrl).toBe(
-      "https://zcode.z.ai/remote/v3",
+      buildZCodeEndpointUrls("https://zcode.invalid", { appVersion: "3.4.1-alpha..1" }).remoteUrl,
+    ).toBe("https://zcode.invalid/remote/v3");
+    expect(buildZCodeEndpointUrls("https://zcode.invalid", { appVersion: "3.4.1-01" }).remoteUrl).toBe(
+      "https://zcode.invalid/remote/v3",
     );
   });
 
   it("derives runtime zcode-plan urls from ZCODE_ENV", () => {
     expect(buildRuntimeZCodeEndpointUrls({ ZCODE_ENV: "test" }).zcodePlanOpenAiBaseUrl).toBe(
-      "https://zcode.z.ai/api/v1/zcode-plan",
+      "https://zcode.invalid/api/v1/zcode-plan",
     );
     expect(buildRuntimeZCodeEndpointUrls({ ZCODE_ENV: "production" }).zcodePlanOpenAiBaseUrl).toBe(
-      "https://zcode.z.ai/api/v1/zcode-plan",
+      "https://zcode.invalid/api/v1/zcode-plan",
     );
     expect(buildRuntimeZCodeEndpointUrls({}).zcodePlanOpenAiBaseUrl).toBe(
-      "https://zcode.z.ai/api/v1/zcode-plan",
+      "https://zcode.invalid/api/v1/zcode-plan",
     );
     expect(
       buildRuntimeZCodeEndpointUrls({
         ZCODE_ENV: "test",
-        ZCODE_BASE_URL: "https://zcode.z.ai/ignored/path",
+        ZCODE_BASE_URL: "https://zcode.invalid/ignored/path",
       }).zcodePlanAnthropicBaseUrl,
-    ).toBe("https://zcode.z.ai/api/v1/zcode-plan/anthropic");
+    ).toBe("https://zcode.invalid/api/v1/zcode-plan/anthropic");
   });
 
   it("derives V2 relay from each endpoint origin", () => {
@@ -139,7 +139,7 @@ describe("zcodeEndpoint", () => {
       resolveWebRemoteControlRelayWsUrl({
         endpointOrigin: TEST_ZCODE_ENDPOINT_ORIGIN,
       }),
-    ).toBe("wss://zcode.z.ai/api/v1/remote/ws2");
+    ).toBe("wss://zcode.invalid/api/v1/remote/ws2");
     expect(
       resolveWebRemoteControlRelayWsUrl({
         endpointOrigin: DEFAULT_ZCODE_ENDPOINT_ORIGIN,
@@ -162,25 +162,25 @@ describe("zcodeEndpoint", () => {
   });
 
   it("derives BigModel API origin from ZCODE_ENV", () => {
-    expect(resolveBigModelApiOrigin({ ZCODE_ENV: "production" })).toBe("https://bigmodel.cn");
-    expect(resolveBigModelApiOrigin({ ZCODE_ENV: "test" })).toBe("https://bigmodel.cn");
+    expect(resolveBigModelApiOrigin({ ZCODE_ENV: "production" })).toBe("https://bigmodel.invalid");
+    expect(resolveBigModelApiOrigin({ ZCODE_ENV: "test" })).toBe("https://bigmodel.invalid");
     expect(buildBigModelApiUrl({ ZCODE_ENV: "test" }, "/api/biz/subscription/list")).toBe(
-      "https://bigmodel.cn/api/biz/subscription/list",
+      "https://bigmodel.invalid/api/biz/subscription/list",
     );
   });
 
   it("derives BigModel Coding Plan manage urls from ZCODE_ENV", () => {
     expect(buildBigModelCodingPlanPersonalManageUrl({ ZCODE_ENV: "test" })).toBe(
-      "https://bigmodel.cn/coding-plan/personal/overview",
+      "https://bigmodel.invalid/coding-plan/personal/overview",
     );
     expect(buildBigModelCodingPlanPersonalManageUrl({ ZCODE_ENV: "production" })).toBe(
-      "https://bigmodel.cn/coding-plan/personal/overview",
+      "https://bigmodel.invalid/coding-plan/personal/overview",
     );
     expect(buildBigModelCodingPlanTeamManageUrl({ ZCODE_ENV: "test" })).toBe(
-      "https://bigmodel.cn/coding-plan/team/plans",
+      "https://bigmodel.invalid/coding-plan/team/plans",
     );
     expect(buildBigModelCodingPlanTeamManageUrl({ ZCODE_ENV: "production" })).toBe(
-      "https://bigmodel.cn/coding-plan/team/plans",
+      "https://bigmodel.invalid/coding-plan/team/plans",
     );
   });
 
@@ -208,16 +208,16 @@ describe("zcodeEndpoint", () => {
 
   it("builds product endpoint URLs from the selected environment", () => {
     expect(buildRuntimeZCodeApiUrl({ ZCODE_ENV: "test" }, "/api/v1/oauth/token")).toBe(
-      "https://zcode.z.ai/api/v1/oauth/token",
+      "https://zcode.invalid/api/v1/oauth/token",
     );
     expect(buildRuntimeZaiOAuthUrl({ ZCODE_ENV: "test" }, "/api/oauth/authorize")).toBe(
-      "https://chat.z.ai/api/oauth/authorize",
+      "https://chat.z.ai.invalid/api/oauth/authorize",
     );
     expect(buildRuntimeZaiBusinessUrl({ ZCODE_ENV: "test" }, "/api/auth/z/login")).toBe(
-      "https://api.z.ai/api/auth/z/login",
+      "https://api.z.ai.invalid/api/auth/z/login",
     );
     expect(buildBigModelApiUrl({ ZCODE_ENV: "test" }, "/login")).toBe(
-      "https://bigmodel.cn/login",
+      "https://bigmodel.invalid/login",
     );
   });
 
@@ -289,7 +289,7 @@ describe("zcodeEndpoint", () => {
 
   it("persists optional endpoint override in app settings", () => {
     expect(
-      appSettingsSchema.parse({ zcodeEndpointOrigin: "https://zcode.z.ai/path" })
+      appSettingsSchema.parse({ zcodeEndpointOrigin: "https://zcode.invalid/path" })
         .zcodeEndpointOrigin,
     ).toBe(TEST_ZCODE_ENDPOINT_ORIGIN);
     expect(

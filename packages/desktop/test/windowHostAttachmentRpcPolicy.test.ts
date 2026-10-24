@@ -30,7 +30,8 @@ describe("Window Host attachment RPC policy", () => {
     expect([...policy!.allowedChannels].every((channel) => registeredChannels.has(channel))).toBe(
       true,
     );
-    expect(policy?.allowedChannels.size).toBe(46);
+    // BYOK fork P1c：botsService 渠道随 bot 通道删除，白名单 46→45。
+    expect(policy?.allowedChannels.size).toBe(45);
   });
 
   it("keeps the complete service surface for desktop attachments", () => {

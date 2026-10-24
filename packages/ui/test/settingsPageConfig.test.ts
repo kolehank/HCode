@@ -42,6 +42,8 @@ describe("settingsPageConfig", () => {
           "appearance",
           "modelProvider",
           "browser",
+          // BYOK fork A2：新增 remoteAccess（内嵌远程访问）分区，位于浏览器之后。
+          "remoteAccess",
           "remoteDevices",
           "shortcuts",
         ],
@@ -64,6 +66,8 @@ describe("settingsPageConfig", () => {
       "commands",
       "hooks",
       "browser",
+      // BYOK fork A2：新增 remoteAccess（内嵌远程访问）分区，位于浏览器之后。
+      "remoteAccess",
       "remoteDevices",
       "shortcuts",
       "usage",
@@ -99,6 +103,8 @@ describe("settingsPageConfig", () => {
       "appearance",
       "modelProvider",
       "browser",
+      // BYOK fork A2：新增 remoteAccess（内嵌远程访问）分区，位于浏览器之后。
+      "remoteAccess",
       "remoteDevices",
       "computerUse",
       "shortcuts",

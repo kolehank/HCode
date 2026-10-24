@@ -115,6 +115,10 @@ describe("Provider Provisioning Source", () => {
       settingService: { get: vi.fn(async () => ({})) } as never,
       credentialFilePath: credentialsPath,
       personalConfigFilePath: join(root, "provider_config.json"),
+      // BYOK fork：P2 主密钥改 OS keychain，同步构造必须显式注入 env cipher，否则缺 ZCODE_CREDENTIAL_SECRET 直接失败。
+      cipherProvider: createCredentialCipherProvider({
+        env: { ZCODE_CREDENTIAL_SECRET: "source" },
+      }),
     });
 
     await expect(source.read("sync-malformed-allowlist")).rejects.toThrow(

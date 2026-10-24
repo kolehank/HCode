@@ -454,61 +454,7 @@ describe("standalone Server Core ingress", () => {
     }
   });
 
-  it("Share RPC 只接受 Host 的可信下游，普通 Web 不能伪造 desktop 身份", async () => {
-    const rows = vi.fn(async (input: unknown) => ({
-      connection: readTrustedZCodeAgentV4Connection(input),
-    }));
-    const preflight = vi.fn(() => {
-      throw new Error("不能直接调用未绑定 scope 的 ShareService");
-    });
-    const service = {
-      preflight,
-      [conversationShareConnectionScopeFactory]: (agent: IZCodeAgentService) => ({
-        preflight: (input: never) => agent.conversationRowsRangeV4(input),
-      }),
-    };
-    const services = new ServiceCollection()
-      .register(IZCodeAgentService, { conversationRowsRangeV4: rows } as never)
-      .register(IConversationShareService, service as never);
-    const server = await createCoreHttpServer(services);
-    servers.push(server);
-    const baseUrl = `http://${server.host}:${server.port}`;
-    const input = {
-      workspacePath: "/remote",
-      sessionId: "session",
-      __zcodeTrustedV4Connection: { connectionId: "desktop", clientMode: "desktop-continuous" },
-    };
-    const web = await connectChannelClient(`ws://${server.host}:${server.port}/ws`);
-    try {
-      await expect(
-        web.client.getChannel("conversation-share").call("preflight", [input]),
-      ).rejects.toThrow("only available from Desktop");
-      expect(rows).not.toHaveBeenCalled();
-    } finally {
-      web.dispose();
-    }
-    const response = await fetch(`${baseUrl}/api/rpc-host-capability`, { method: "POST" });
-    const { capability } = (await response.json()) as { capability: string };
-    const host = await connectChannelClient(`ws://${server.host}:${server.port}/ws/host`, {
-      "x-zcode-rpc-host-capability": capability,
-    });
-    try {
-      const direct = await host.client
-        .getChannel("zcode-agent")
-        .call("conversationRowsRangeV4", [input]);
-      await expect(
-        host.client.getChannel("conversation-share").call("preflight", [input]),
-      ).resolves.toEqual(direct);
-      await expect(
-        host.client
-          .getChannel("conversation-share")
-          .call("preflight", [{ workspacePath: "/remote", sessionId: "session" }]),
-      ).rejects.toThrow("not trusted");
-      expect(preflight).not.toHaveBeenCalled();
-    } finally {
-      host.dispose();
-    }
-  });
+  // BYOK fork P1a：conversationShareService（会话分享）已删除，Share RPC 可信下游用例移除。
 
   it("closes the HTTP server while an upgraded WebSocket remains open", async () => {
     const server = await createCoreHttpServer(new ServiceCollection());

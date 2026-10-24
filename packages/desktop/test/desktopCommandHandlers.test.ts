@@ -280,15 +280,15 @@ describe("desktopCommandHandlers resolveFeedbackUrl", () => {
     await openChangelog("zh-CN");
     await openChangelog("en-US");
 
-    expect(shell.openExternal).toHaveBeenNthCalledWith(1, "https://zcode.z.ai/cn/changelog");
-    expect(shell.openExternal).toHaveBeenNthCalledWith(2, "https://zcode.z.ai/en/changelog");
+    expect(shell.openExternal).toHaveBeenNthCalledWith(1, "https://zcode.invalid/cn/changelog");
+    expect(shell.openExternal).toHaveBeenNthCalledWith(2, "https://zcode.invalid/en/changelog");
   });
 
   it("changelog 按当前非生产 endpoint 打开", async () => {
     const { executeDesktopCommand } = await import("../src/main/desktopCommandHandlers.js");
     const { shell } = await import("electron");
     const commandOptions = createCommandOptions({
-      settings: { zcodeEndpointOrigin: "https://zcode.z.ai" },
+      settings: { zcodeEndpointOrigin: "https://zcode.invalid" },
     });
 
     await executeDesktopCommand({
@@ -297,7 +297,7 @@ describe("desktopCommandHandlers resolveFeedbackUrl", () => {
       currentApplicationLocale: "en-US",
     });
 
-    expect(shell.openExternal).toHaveBeenCalledWith("https://zcode.z.ai/en/changelog");
+    expect(shell.openExternal).toHaveBeenCalledWith("https://zcode.invalid/en/changelog");
   });
 
   it("relaunch app 命令交给主进程重启回调", async () => {
@@ -323,8 +323,9 @@ describe("desktopCommandHandlers resolveFeedbackUrl", () => {
     });
 
     expect(sessionFromPartitionMock).toHaveBeenCalledWith("persist:zcode-coding-plan");
-    expect(sessionFromPartitionMock).toHaveBeenCalledWith("persist:zcode-rewards");
-    expect(codingPlanPartitionSession.clearStorageData).toHaveBeenCalledTimes(2);
+    // BYOK fork P1d：rewards partition 随营销族删除，仅清理 coding-plan partition。
+    expect(sessionFromPartitionMock).not.toHaveBeenCalledWith("persist:zcode-rewards");
+    expect(codingPlanPartitionSession.clearStorageData).toHaveBeenCalledTimes(1);
     expect(commandOptions.logger.info).toHaveBeenCalledWith(
       "[coding-plan-webview] cleared persistent partition storage",
     );
@@ -340,7 +341,7 @@ describe("desktopCommandHandlers resolveFeedbackUrl", () => {
       command: DesktopCommandIds.SetZCodeEndpointTest,
     });
     expect(commandOptions.settingService.update).toHaveBeenLastCalledWith({
-      zcodeEndpointOrigin: "https://zcode.z.ai",
+      zcodeEndpointOrigin: "https://zcode.invalid",
     });
 
     await executeDesktopCommand({

@@ -609,8 +609,9 @@ function SubagentModelOverrideControl({
     config: { model?: string; thoughtLevel?: string },
   ) => Promise<void>;
 }) {
-  // BYOK fork P1a：Start Plan 推荐恒 null。
-  const recommendStartPlan = async (_selection: unknown): Promise<null> => null;
+  // BYOK fork P1a：Start Plan 推荐删除。原 hook 无推荐时返回原 selection（仅用户 dismiss 才 null），
+  // stub 必须保持「原样透传」语义，否则所有模型切换都会被当成 dismiss 回滚（手术误伤修复）。
+  const recommendStartPlan = async <T,>(selection: T): Promise<T> => selection;
   const { intl } = useZCodeIntl();
   const [pending, setPending] = useState(false);
   const [config, setConfig] = useState<{
@@ -680,14 +681,9 @@ function SubagentModelOverrideControl({
             setConfig(previousConfig);
             return;
           }
-          const recommended = chosen as { providerId: string; modelId: string; options?: { reasoningLevel?: string } } | null;
-          if (!recommended) {
-            setConfig(previousConfig);
-            return;
-          }
           selectedConfig = {
-            model: toSubagentModelValue(recommended),
-            thoughtLevel: recommended.options?.reasoningLevel,
+            model: toSubagentModelValue(chosen),
+            thoughtLevel: chosen.options?.reasoningLevel,
           };
         }
         await onModelOverrideChange(agent, selectedConfig);
@@ -823,8 +819,8 @@ function SubagentForm({
   workspaceTabs: ConfigWorkspaceTarget[];
   onScopeKeyChange: (scopeKey: string) => void;
 }) {
-  // BYOK fork P1a：Start Plan 推荐恒 null。
-  const recommendStartPlan = async (_selection: unknown): Promise<null> => null;
+  // BYOK fork P1a：Start Plan 推荐删除。stub 保持「原样透传」语义（见 SubagentModelOverrideControl 注释）。
+  const recommendStartPlan = async <T,>(selection: T): Promise<T> => selection;
   const { intl } = useZCodeIntl();
   const initialFormStateKey = createSubagentFormInitialStateKey(initial);
   const initialFormState = useMemo(

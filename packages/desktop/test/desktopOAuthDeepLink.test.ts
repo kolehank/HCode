@@ -317,55 +317,8 @@ describe("desktopOAuthDeepLink workspace open routing", () => {
   });
 });
 
-describe("desktopOAuthDeepLink OAuth routing", () => {
-  it("归因-only 回调不消费 OAuth state 路由，真实授权码回调才消费", async () => {
-    vi.useFakeTimers();
-    try {
-      const targetWindow = createMockWindow(31);
-      const logger = { info: vi.fn(), warn: vi.fn() };
-      electronMocks.getAllWindows.mockReturnValue([targetWindow]);
-
-      const { handleDeepLink, registerOAuthState } =
-        await import("../src/main/desktopOAuthDeepLink.js");
-
-      registerOAuthState(31, { state: "state-001", provider: "bigmodel" });
-
-      expect(
-        handleDeepLink("zcode://oauth/callback?state=state-001&utm_source=google", logger),
-      ).toBe(true);
-      expect(targetWindow.webContents.send).toHaveBeenCalledWith(
-        PlatformChannels.OAuthCallback,
-        "zcode://oauth/callback?state=state-001&utm_source=google",
-      );
-
-      targetWindow.webContents.send.mockClear();
-
-      expect(
-        handleDeepLink("zcode://oauth/callback?authCode=auth-001&state=state-001", logger),
-      ).toBe(true);
-      expect(targetWindow.webContents.send).toHaveBeenCalledWith(
-        PlatformChannels.OAuthCallback,
-        "zcode://oauth/callback?authCode=auth-001&state=state-001",
-      );
-
-      targetWindow.webContents.send.mockClear();
-
-      expect(
-        handleDeepLink("zcode://oauth/callback?authCode=auth-002&state=state-001", logger),
-      ).toBe(false);
-      expect(targetWindow.webContents.send).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenLastCalledWith(
-        "[deep-link] OAuth 回调未命中目标窗口，先缓存等待 renderer ready",
-        {
-          state: "state-001",
-          hasRouteTarget: false,
-        },
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
+// BYOK fork P1b：OAuth 回调路由（state→window 注册表与投递）已删除，
+// 「OAuth routing」describe 随之移除。
 
 function createTempWorkspace(): string {
   const dir = mkdtempSync(join(tmpdir(), "zcode-workspace-open-"));

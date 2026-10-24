@@ -82,47 +82,8 @@ async function setup(active = false) {
 }
 
 describe("Builtin 远端失败不阻断有效本地配置的业务刷新", () => {
-  it.each([
-    ["HTTP 地址校验失败", false, "invalid-url"],
-    ["下载服务 503", true, "http-error"],
-    ["下载正文不是 JSON", false, "invalid-json"],
-    ["请求取消", true, "cancelled"],
-  ] as const)("%s：继续更新 Team/Start 权益并保留本地 Release", async (_, active, failure) => {
-    const fixture = await setup(active);
-    const before = await readFile(fixture.activePath, "utf8");
-    const request = vi.fn(async () => {
-      if (failure === "http-error") return new Response("unavailable", { status: 503 });
-      if (failure === "invalid-json") return new Response("not json");
-      return Response.json({
-        code: 0,
-        data: { configs: { builtin_provider_config_json: "http://cdn.example.com/release.json" } },
-      });
-    });
-    fixture.download.mockImplementation(async () => {
-      await downloadZCodeBuiltinRelease({
-        endpointOrigin: "https://control.example.com",
-        platform: "linux-x86_64",
-        appVersion: "test",
-        request,
-        ...(failure === "cancelled" ? { signal: AbortSignal.abort() } : {}),
-      });
-      return null;
-    });
-    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
-    fixture.grant();
-    await fixture.runtime.providerSettings.refresh("composer-connection");
-    const view = await fixture.runtime.modelSelection.getView();
-    for (const id of plans) {
-      const provider = view.providers.find((entry) => entry.providerId === id);
-      expect(provider?.config.access).toMatchObject({ entitled: true });
-      expect(provider?.models.length).toBeGreaterThan(0);
-    }
-    expect(fixture.resolve).toHaveBeenCalled();
-    expect(warning).toHaveBeenCalled();
-    expect(await readFile(fixture.activePath, "utf8")).toBe(before);
-    if (failure === "invalid-url") expect(request).toHaveBeenCalledTimes(1);
-  });
-
+  // BYOK fork P1b：内置 provider CDN 远程同步已删除（refresh 恒 skipped），
+  // 原 it.each 四例断言的"远端下载失败不阻断本地刷新"行为不复存在，予以移除。
   it("远端和账号同时失败时，返回真实账号错误，不用旧权益伪装成功", async () => {
     const fixture = await setup();
     fixture.download.mockRejectedValue(new Error("remote unavailable"));

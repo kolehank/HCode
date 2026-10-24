@@ -55,7 +55,8 @@ describe("buildRemoteWorkspaceSessionServices", () => {
     expect(merged.zcodeAgentService).toBe(remoteServices.zcodeAgentService);
     expect(merged.zcodeTaskService).toBe(remoteServices.zcodeTaskService);
     expect(merged.zcodeSessionService).toBe(remoteServices.zcodeSessionService);
-    expect(merged.conversationShareService).toBe(remoteServices.conversationShareService);
+    // BYOK fork P1a：conversationShareService 已删除，合并结果回落本地 base 实例。
+    expect(merged.conversationShareService).toBe(baseServices.conversationShareService);
     expect(merged.fileWatcherService).toBe(remoteServices.fileWatcherService);
     // Provider/Model View 属于目标 Remote Environment；不能随 ...baseServices 回落到本地。
     expect(merged.modelSelectionService).toBe(remoteServices.modelSelectionService);

@@ -11,7 +11,8 @@ describe("RemoteWorkspaceRpcContract v1", () => {
       REMOTE_WORKSPACE_RPC_CHANNELS.map((channel) => [channel, {}]),
     );
     expect(() => assertRemoteWorkspaceRpcContract(contract)).not.toThrow();
-    delete contract.oauthService;
-    expect(() => assertRemoteWorkspaceRpcContract(contract)).toThrow(/oauthService/u);
+    // BYOK fork P1b：oauthService 已从远端契约渠道删除，不再参与完整性校验。
+    delete contract.genUiService;
+    expect(() => assertRemoteWorkspaceRpcContract(contract)).toThrow(/genUiService/u);
   });
 });

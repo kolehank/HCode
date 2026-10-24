@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ICredentialService } from "../src/credential/credential.js";
 
 const originalHome = process.env.HOME;
+const originalCredentialSecret = process.env.ZCODE_CREDENTIAL_SECRET;
 const tempHomes: string[] = [];
 
 function makeTempHome(): string {
@@ -19,6 +20,9 @@ async function createCredentialServiceInHome(
   onDidMutate?: (event: { operation: "save" | "delete"; key: string }) => void,
 ): Promise<ICredentialService> {
   process.env.HOME = home;
+  // BYOK fork：P2 主密钥默认走 OS keychain（测试进程会弹钥匙串授权），
+  // 用显式覆盖的 ZCODE_CREDENTIAL_SECRET 保证单测确定性与 CI 可运行。
+  process.env.ZCODE_CREDENTIAL_SECRET = "test-credential-secret";
   vi.resetModules();
   const mod = await import("../src/credential/credentialService.js");
   return mod.createCredentialService({ onDidMutate });
@@ -26,6 +30,11 @@ async function createCredentialServiceInHome(
 
 afterEach(() => {
   process.env.HOME = originalHome;
+  if (originalCredentialSecret === undefined) {
+    delete process.env.ZCODE_CREDENTIAL_SECRET;
+  } else {
+    process.env.ZCODE_CREDENTIAL_SECRET = originalCredentialSecret;
+  }
 
   while (tempHomes.length > 0) {
     const home = tempHomes.pop();

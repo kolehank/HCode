@@ -17,49 +17,22 @@ describe("feedback store", () => {
     resetFeedbackStore();
   });
 
-  it("keeps feature request and issue report dialogs mutually exclusive", () => {
+  // BYOK fork P1a：feedback 反馈中心（飞书表单厂商通道）已删除，store 动作全部 no-op。
+  // 旧「互斥打开 / 打开后台提交 / 按 jobId 打开」交互用例改为断言动作不再改写状态。
+  it("keeps all legacy dialog actions as no-ops after the feedback channel removal", () => {
     useFeedbackStore.getState().openFeatureRequest();
     expect(useFeedbackStore.getState()).toMatchObject({
       open: false,
-      featureRequestOpen: true,
-    });
-
-    useFeedbackStore.getState().openSubmit({ includeLogs: true });
-    expect(useFeedbackStore.getState()).toMatchObject({
-      open: true,
       featureRequestOpen: false,
-      tab: "submit",
-    });
-
-    useFeedbackStore.getState().openFeatureRequest();
-    expect(useFeedbackStore.getState()).toMatchObject({
-      open: false,
-      featureRequestOpen: true,
-    });
-  });
-
-  it("always opens issue reports as a new form instead of reusing a background submission", () => {
-    useFeedbackStore.getState().openSubmissionJob("feedback-job-a");
-    expect(useFeedbackStore.getState()).toMatchObject({
-      open: true,
-      tab: "submit",
-      submissionJobId: "feedback-job-a",
     });
 
     useFeedbackStore.getState().openSubmit({ includeLogs: true });
     expect(useFeedbackStore.getState()).toMatchObject({
-      open: true,
-      tab: "submit",
-      submissionJobId: null,
-      submitDraft: { includeLogs: true },
+      open: false,
+      submitDraft: null,
     });
-  });
 
-  it("opens each background submission by its own job id", () => {
     useFeedbackStore.getState().openSubmissionJob("feedback-job-a");
-    expect(useFeedbackStore.getState().submissionJobId).toBe("feedback-job-a");
-
-    useFeedbackStore.getState().openSubmissionJob("feedback-job-b");
-    expect(useFeedbackStore.getState().submissionJobId).toBe("feedback-job-b");
+    expect(useFeedbackStore.getState().submissionJobId).toBeNull();
   });
 });

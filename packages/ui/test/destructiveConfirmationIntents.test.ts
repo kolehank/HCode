@@ -8,7 +8,7 @@ const destructiveEntries = [
   ["project-sidebar/useArchiveManagement.ts", "archives.deleteTitle"],
   // V2 已移除刷新配对入口；无刷新按钮由 webRemoteControlDialogLayout 回归覆盖。
   ["settings/CommandsSection.tsx", "settings.commands.delete.title"],
-  ["settings/AutomationsSection.tsx", "offPeak.delete.title"],
+  // BYOK fork P1a：offPeak.delete.title 入口随闲时任务 UI 删除，移出核对清单。
   [
     "settings/model-provider-section/modelProviderActions.ts",
     "settings.modelProvider.deleteConfirmTitle",

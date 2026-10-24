@@ -181,7 +181,8 @@ describe("WindowsCaptionMenuButton", () => {
       }),
     );
     expect(capturedWindowsCaptionMenu.openFeatureRequest).toHaveBeenCalledTimes(1);
-    expect(capturedWindowsCaptionMenu.openExternal).toHaveBeenCalledWith("https://zcode.z.ai/docs");
+    // BYOK fork P0：产品文档链接中性化为空串（ZCODE_PRODUCT_DOCS_URL = ""）。
+    expect(capturedWindowsCaptionMenu.openExternal).toHaveBeenCalledWith("");
     expect(capturedWindowsCaptionMenu.exportLogs).toHaveBeenCalledTimes(1);
   });
 

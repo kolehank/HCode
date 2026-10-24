@@ -239,8 +239,10 @@ describe("ConversationTelemetryWorkspaceAttachment", () => {
 
     unmount(firstRoot);
     expect(service.removedLastListener).not.toHaveBeenCalled();
+    // BYOK fork P1a：model.request.status 的 plan_request ARMS 上报已 no-op；
+    // 该用例核心是 supervisor 订阅生命周期，事件仍被消费（去重 ledger 生效）但不产生 ARMS。
     service.facts.fire(modelFact("background-after-pane-close"));
-    expect(reportArmsCustomEvent).toHaveBeenCalledTimes(1);
+    expect(reportArmsCustomEvent).toHaveBeenCalledTimes(0);
 
     const secondRoot = mountAttachment({
       services: service.services,
@@ -251,13 +253,13 @@ describe("ConversationTelemetryWorkspaceAttachment", () => {
     expect(seen.at(-1)).toBe(firstSupervisor);
     expect(service.onFact).toHaveBeenCalledTimes(1);
     service.facts.fire(modelFact("after-remount"));
-    expect(reportArmsCustomEvent).toHaveBeenCalledTimes(2);
+    expect(reportArmsCustomEvent).toHaveBeenCalledTimes(0);
 
     unmount(secondRoot);
     reconcileConversationTelemetryWorkspaceScopes([]);
     expect(service.removedLastListener).toHaveBeenCalledTimes(1);
     service.facts.fire(modelFact("after-detach"));
-    expect(reportArmsCustomEvent).toHaveBeenCalledTimes(2);
+    expect(reportArmsCustomEvent).toHaveBeenCalledTimes(0);
   });
 
   it("service generation 替换与 remoteSessionId/workspaceIdentity 使用独立 supervisor", () => {

@@ -149,52 +149,8 @@ describe("WorkspaceHeaderActionSection", () => {
     expect(html).toContain("sidePane.expand");
   });
 
-  it("只在 Desktop local/SSH/WSL/Docker 已有任务显示分享入口", async () => {
-    const { WorkspaceHeaderActionSection } =
-      await import("@/WorkspaceHeaderSections/WorkspaceHeaderActionSection.js");
-    const renderSection = (extra: Record<string, unknown>) =>
-      renderToStaticMarkup(
-        withSettingsServices(WorkspaceHeaderActionSection, {
-          activeTaskId: "task-1",
-          workspaceAbsPath: "/workspace",
-          isTerminalOpen: false,
-          isSidePaneOpen: false,
-          onToggleTerminal: vi.fn(),
-          onToggleSidePane: vi.fn(),
-          isDesktop: true,
-          user: { id: "user-1" },
-          ...extra,
-        }),
-      );
-
-    expect(renderSection({})).toContain("conversationShare.trigger");
-    expect(renderSection({ remoteTarget: { kind: "ssh" } })).toContain("conversationShare.trigger");
-    expect(renderSection({ isWebRemoteControl: true })).not.toContain("conversationShare.trigger");
-    expect(renderSection({ isDesktop: false })).not.toContain("conversationShare.trigger");
-    expect(renderSection({ remoteTarget: { kind: "server" } })).not.toContain(
-      "conversationShare.trigger",
-    );
-  });
-
-  it("未登录时不展示分享入口", async () => {
-    const { WorkspaceHeaderActionSection } =
-      await import("@/WorkspaceHeaderSections/WorkspaceHeaderActionSection.js");
-
-    const html = renderToStaticMarkup(
-      withSettingsServices(WorkspaceHeaderActionSection, {
-        activeTaskId: "task-1",
-        workspaceAbsPath: "/workspace",
-        isTerminalOpen: false,
-        isSidePaneOpen: false,
-        onToggleTerminal: vi.fn(),
-        onToggleSidePane: vi.fn(),
-        isDesktop: true,
-        user: null,
-      }),
-    );
-
-    expect(html).not.toContain("conversationShare.trigger");
-  });
+  // BYOK fork P1a：会话分享入口（conversationShare.trigger）已删除，
+  // 「分享入口可见性」与「未登录不展示分享」用例随之移除。
 
   it("renders the help menu trigger before the terminal toggle", async () => {
     const { WorkspaceHeaderActionSection } =
@@ -303,7 +259,8 @@ describe("WorkspaceHeaderActionSection", () => {
     );
     expect(capturedHeaderHelp.openFeatureRequest).toHaveBeenCalledTimes(1);
     expect(capturedHeaderHelp.openCommunity).toHaveBeenCalledTimes(1);
-    expect(capturedHeaderHelp.openExternal).toHaveBeenCalledWith("https://zcode.z.ai/docs");
+    // BYOK fork P0：产品文档链接中性化为空串，docs 项只保留入口、不跳厂商站点。
+    expect(capturedHeaderHelp.openExternal).toHaveBeenCalledWith("");
     expect(capturedHeaderHelp.exportLogs).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+// BYOK fork P1a：off-peak/Idle tab 随闲时任务 UI 删除，相关用例移除；
+// 保留 Scheduled 单 tab 的现有语义断言。
 import {
   canRestartAutomation,
   canToggleAutomation,
@@ -9,7 +11,6 @@ import {
   resolveAutomationTabNavigation,
   resolveAutomationDetailTarget,
   resolveAutomationTemplateVisibility,
-  resolveAutomationTabAfterOffPeakChange,
   resolveVisibleAutomationTabs,
 } from "@/settings/AutomationsSection.js";
 
@@ -70,34 +71,10 @@ describe("canRestartAutomation", () => {
     });
   });
 
-  it("后台关闭闲时灰度后只保留 Scheduled tab", () => {
-    expect(
-      resolveVisibleAutomationTabs({
-        hasAnyTasks: true,
-        offPeakVisible: false,
-      }),
-    ).toEqual(["scheduled"]);
-  });
-
-  it("仅在闲时灰度可见或有闲时存量时展示 Idle tab", () => {
-    expect(
-      resolveVisibleAutomationTabs({
-        hasAnyTasks: true,
-        offPeakVisible: true,
-      }),
-    ).toEqual(["scheduled", "idle"]);
-    expect(
-      resolveVisibleAutomationTabs({
-        hasAnyTasks: false,
-        offPeakVisible: true,
-      }),
-    ).toEqual([]);
-  });
-
-  it("灰度关闭时将已选中的 Idle tab 收敛回 Scheduled", () => {
-    expect(resolveAutomationTabAfterOffPeakChange("idle", false)).toBe("scheduled");
-    expect(resolveAutomationTabAfterOffPeakChange("scheduled", false)).toBe("scheduled");
-    expect(resolveAutomationTabAfterOffPeakChange("idle", true)).toBe("idle");
+  it("无任务时不展示任何 tab，有任务只展示 Scheduled", () => {
+    // BYOK fork P1a：Idle tab 已删除；offPeakVisible 参数不再参与判定。
+    expect(resolveVisibleAutomationTabs({ hasAnyTasks: true })).toEqual(["scheduled"]);
+    expect(resolveVisibleAutomationTabs({ hasAnyTasks: false })).toEqual([]);
   });
 
   it("仅在 tabs 数据就绪且 Idle tab 可见时应用 OFFPEAK 导航", () => {
@@ -124,58 +101,31 @@ describe("canRestartAutomation", () => {
     ).toEqual({ status: "settled", tab: "scheduled" });
   });
 
-  it("无任务时同时展示可用的闲时模板和定时任务模板", () => {
+  it("无任务时展示 Scheduled 模板，有任务时按 tab 分流", () => {
+    // BYOK fork P1a：offPeakCreationEnabled 与 showOffPeakTemplates 已删除，
+    // 仅保留 Scheduled 模板可见性语义。
     expect(
       resolveAutomationTemplateVisibility({
         hasAnyTasks: false,
-        offPeakCreationEnabled: true,
         tab: "scheduled",
       }),
     ).toEqual({
-      showOffPeakTemplates: true,
-      showScheduledTemplates: true,
-    });
-    expect(
-      resolveAutomationTemplateVisibility({
-        hasAnyTasks: false,
-        offPeakCreationEnabled: true,
-        tab: "idle",
-      }),
-    ).toEqual({
-      showOffPeakTemplates: true,
-      showScheduledTemplates: true,
-    });
-    expect(
-      resolveAutomationTemplateVisibility({
-        hasAnyTasks: false,
-        offPeakCreationEnabled: false,
-        tab: "scheduled",
-      }),
-    ).toEqual({
-      showOffPeakTemplates: false,
-      showScheduledTemplates: true,
-    });
-  });
-
-  it("有任务时继续按 Scheduled 和 Idle tab 分流模板", () => {
-    expect(
-      resolveAutomationTemplateVisibility({
-        hasAnyTasks: true,
-        offPeakCreationEnabled: true,
-        tab: "scheduled",
-      }),
-    ).toEqual({
-      showOffPeakTemplates: false,
       showScheduledTemplates: true,
     });
     expect(
       resolveAutomationTemplateVisibility({
         hasAnyTasks: true,
-        offPeakCreationEnabled: true,
-        tab: "idle",
+        tab: "scheduled",
       }),
     ).toEqual({
-      showOffPeakTemplates: true,
+      showScheduledTemplates: true,
+    });
+    expect(
+      resolveAutomationTemplateVisibility({
+        hasAnyTasks: true,
+        tab: "idle" as never,
+      }),
+    ).toEqual({
       showScheduledTemplates: false,
     });
   });

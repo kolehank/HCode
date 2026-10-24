@@ -91,12 +91,12 @@ describe("Window Host 的 Source 重连与数据库启动整合", () => {
           parentPort: {},
           logger: { warn() {} },
           remoteMediaRangePreviewEnabled: false,
+          // BYOK fork P1a：clientConfigService 参数已随厂商远端配置删除，mock 返回恒 undefined。
           createServerRemoteWorkspaceServiceCollection: (params: {
             connectionServices: RemoteServices;
-            clientConfigService: object;
           }) => ({
             generation: params.connectionServices.generation,
-            clientConfig: params.clientConfigService,
+            clientConfig: undefined,
           }),
           resolveResourceTelemetryEnvironmentKey: () => "environment",
           registerHostServiceResourceTelemetry: (params: {
@@ -138,14 +138,15 @@ describe("Window Host 的 Source 重连与数据库启动整合", () => {
       });
 
       expect(generations).toEqual([2]);
+      // BYOK fork P1a：clientConfigService 已删除，注册的 config 恒 undefined。
       expect(registrations).toEqual([
         {
           generation: 1,
           disposed: true,
-          config: clientConfig,
+          config: undefined,
           telemetrySupported: initialTelemetryCapability === true,
         },
-        { generation: 2, disposed: false, config: clientConfig, telemetrySupported: true },
+        { generation: 2, disposed: false, config: undefined, telemetrySupported: true },
       ]);
       await handle.dispose();
       expect(registrations.every((registration) => registration.disposed)).toBe(true);

@@ -30,7 +30,8 @@ describe("resolveZCodeBuiltinProviderConfigFilePath", () => {
           env: {},
         }),
       ),
-    ).toBe("/repo/config/provider/zcode-builtin.test.json");
+    // BYOK fork P1b：内置 provider 配置统一切换为 byok-builtin.json。
+    ).toBe("/repo/config/provider/byok-builtin.json");
   });
 
   it("显式 ZCode Built-in Config Source 优先于安装布局", () => {
@@ -63,7 +64,8 @@ describe("开发态按编译环境选取配置", () => {
         }),
       ),
     ).toBe(
-      `/repo/config/provider/${environment === "production" ? "zcode-builtin.json" : "zcode-builtin.test.json"}`,
+      // BYOK fork P1b：内置 provider 配置统一切换为 byok-builtin.json（不再按环境分裂）。
+      "/repo/config/provider/byok-builtin.json",
     );
   });
 });

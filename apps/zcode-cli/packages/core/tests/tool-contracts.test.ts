@@ -53,7 +53,7 @@ const DIRECT_BRANCH_EXPECTED_PROVIDER_TOOL_ORDER = [
   "DeferredToolCall",
   "SendMessage",
   "ReadSessionContext",
-  "ReplyToChannel",
+  // BYOK fork P1c：ReplyToChannel（bots 通道工具）已删除。
   "CreateWorkflow",
   // 修订入口紧随 CreateWorkflow 注册（docs/dynamic-workflow/launch.md「The `AmendWorkflow` tool」）。
   "AmendWorkflow",

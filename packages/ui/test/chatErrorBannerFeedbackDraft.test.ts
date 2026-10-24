@@ -83,18 +83,15 @@ describe("ChatErrorBanner feedback draft", () => {
     resetFeedbackStore();
   });
 
-  it("uses a compact one-line error summary without the generic investigation heading", async () => {
+  it("feedback 入口点击后不再写 feedback 草稿（厂商通道已删，仅保留入口）", async () => {
+    // BYOK fork P1a：feedback 厂商通道删除，openSubmit 为 no-op；
+    // 反馈按钮保留但不再采集截图或写入 submitDraft。
     renderErrorBanner();
 
     await openFeedbackFromBanner();
 
     expect(mockPlatform.captureWindowScreenshot).not.toHaveBeenCalled();
-    expect(useFeedbackStore.getState().submitDraft?.includeLogs).toBe(true);
-    const description = useFeedbackStore.getState().submitDraft?.description;
-    expect(description).toContain("报错摘要：Provider authentication failed.");
-    expect(description).toContain("TraceID: trace-auth-failed");
-    expect(description).not.toContain("我在使用过程中遇到了报错，请帮忙排查。");
-    expect(description).not.toContain("报错摘要\nProvider authentication failed.");
+    expect(useFeedbackStore.getState().submitDraft).toBeNull();
   });
 
   it("没有升级处理器时不展示不可用的升级动作", () => {
@@ -173,6 +170,7 @@ it("远程发送竞态提供重连，反馈归属连接失败而非模型调用"
   expect(button).toBeDefined();
   (button!.onClick as () => void)();
   expect(reconnect).toHaveBeenCalledOnce();
+  // BYOK fork P1a：feedback 草稿不再写入（store no-op），仅验证入口仍可点击。
   await openFeedbackFromBanner();
-  expect(useFeedbackStore.getState().submitDraft?.module).toBe("SSH连接失败");
+  expect(useFeedbackStore.getState().submitDraft).toBeNull();
 });

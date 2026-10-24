@@ -8,23 +8,7 @@ const channel: IChannel = {
   listen: vi.fn(),
 };
 
-describe("RemoteServiceAccess", () => {
-  it("公开配置经独立频道 RPC 读取", async () => {
-    const call = vi.fn(async () => ({ pluginStoreOrder: null }));
-    const requested: string[] = [];
-    const services = new RemoteServiceAccess({
-      getChannel: (name) => {
-        requested.push(name);
-        return { call, listen: vi.fn() } as IChannel;
-      },
-    });
-    expect(await services.clientConfigService.getSnapshot({ forceRefresh: true })).toEqual({
-      pluginStoreOrder: null,
-    });
-    expect(requested).toContain("client-config");
-    expect(call.mock.calls[0]?.slice(0, 2)).toEqual(["getSnapshot", [{ forceRefresh: true }]]);
-  });
-});
+// BYOK fork P1a：clientConfigService（client-config 频道）已删除，「公开配置经独立频道 RPC 读取」用例移除。
 
 describe("RemoteServiceAccess optional channels", () => {
   it("does not construct a Source management proxy for scopes that do not publish it", () => {

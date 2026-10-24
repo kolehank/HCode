@@ -42,7 +42,8 @@ export async function prepareTasksIndexStorage(
   report("checking");
   await mkdir(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
-  let failure: unknown;
+  // BYOK fork：不能在 finally 内 throw（no-unsafe-finally），close 失败先记录、成功路径末尾统一抛出。
+  let closeFailure: unknown;
   let migration: DatabaseMigrationFacts | undefined;
   try {
     db.exec("PRAGMA busy_timeout = 25");
@@ -82,7 +83,6 @@ export async function prepareTasksIndexStorage(
     // COMMIT 已成功，先发布事实；后续 close 失败不能把已提交误报为未提交。
     report("maintaining", migration);
   } catch (error) {
-    failure = error;
     // 失败事实随原异常交给 Worker，不倒退发布 checking/migrating，也不覆盖首因。
     if (migration && error && typeof error === "object") {
       try {
@@ -93,16 +93,14 @@ export async function prepareTasksIndexStorage(
     }
     throw error;
   } finally {
-    // BYOK fork 验收修复：finally 内不再条件 throw（no-unsafe-finally）；
-    // close 失败若已有 failure 则并入原始错误日志，不覆盖正在传播的异常。
     try {
       db.close();
     } catch (error) {
-      if (!failure) {
-        failure = error;
-      }
+      // catch 已重新抛出原始异常，close 失败不覆盖首因，仅在前置成功时于末尾抛出。
+      closeFailure ??= error;
     }
   }
+  if (closeFailure) throw closeFailure;
   markTasksStorageMigrated(path);
   const repos = [
     new TaskIndexRepo(settings, undefined, path, LOCK_WAIT_MS),

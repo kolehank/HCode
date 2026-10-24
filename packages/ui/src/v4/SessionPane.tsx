@@ -1039,8 +1039,10 @@ export function SessionPane({
     // 回收并按最新选择事实重建，已显式选择和正式会话仍保持冻结。
     useZCodeSessionStore.getState().invalidateDraftRuntime(workspacePath, workspaceIdentity);
   }, [draftConfigRef, modelSelectionView?.revision, sessionId, workspaceIdentity, workspacePath]);
-  // BYOK fork P1a：Start Plan 推荐依赖厂商订阅服务，已删除；返回 undefined 不再推荐。
-  const recommendStartPlan = async (_inherited: unknown): Promise<undefined> => undefined;
+  // BYOK fork P1a：Start Plan 推荐依赖厂商订阅服务，已删除。
+  // 原 hook 无推荐时返回原 selection（仅用户 dismiss 才返回 null），stub 必须保持
+  // 「原样透传」语义；否则发送链 if (!chosen) return "blocked" 会拦截所有提交（手术误伤修复）。
+  const recommendStartPlan = async <T,>(inherited: T): Promise<T> => inherited;
   const createSubmissionFromComposer = useCallback(
     () => createComposerSubmissionConfig(draftConfigRef.current, modelSelectionView),
     [draftConfigRef, modelSelectionView],

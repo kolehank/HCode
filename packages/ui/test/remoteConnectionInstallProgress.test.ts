@@ -65,7 +65,8 @@ it("replaces upload percentage with live install stages and preserves the failur
   expect(within(screen.getByRole("list")).queryByText("remote.phaseSub.readyOnline")).toBeNull();
 });
 
-it("连接反馈只附带当前可见日志，不自动上传全量诊断文件", async () => {
+// BYOK fork P1a：feedback 厂商通道删除，openSubmit 为 no-op；反馈入口保留但不写草稿。
+it("连接反馈入口保留，但不再写入 feedback 草稿", async () => {
   render(
     createElement(RemoteConnectionConnectingStep, {
       kind: "ssh",
@@ -77,10 +78,7 @@ it("连接反馈只附带当前可见日志，不自动上传全量诊断文件"
     }),
   );
   fireEvent.click(screen.getByText("remoteConnection.feedback"));
-  await waitFor(() =>
-    expect(useFeedbackStore.getState().submitDraft?.description).toContain("safe connection log"),
-  );
-  expect(useFeedbackStore.getState().submitDraft?.includeLogs).toBe(false);
+  await waitFor(() => expect(useFeedbackStore.getState().submitDraft).toBeNull());
 });
 
 it("shows download progress and speed inside the installation stage with collapsed logs", () => {

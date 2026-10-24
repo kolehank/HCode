@@ -15,6 +15,7 @@ vi.mock("@/logger.js", () => ({
   logger: { warn: loggerWarn },
 }));
 
+// BYOK fork P1a：off-peak-task 场景不再映射进 catalog，数据源改用 scheduled-task（带合法 cron）。
 function offPeakResponse(id: string, title: string): ClientScenesResponse {
   return {
     code: 0,
@@ -22,7 +23,7 @@ function offPeakResponse(id: string, title: string): ClientScenesResponse {
     data: [
       {
         namespace: "zcode",
-        scene: "off-peak-task",
+        scene: "scheduled-task",
         options: {
           prompts: {
             id: "prompts",
@@ -34,6 +35,24 @@ function offPeakResponse(id: string, title: string): ClientScenesResponse {
                 type: "prompts",
                 contents: { en: `${title} prompt` },
                 labels: { en: title },
+                on_finish: null,
+                img: null,
+                defaults: { cronExpr: [`${id}-cron`] },
+              },
+            ],
+            refer: "",
+            templates: {},
+          },
+          cronExpr: {
+            id: "cron",
+            type: "cronExpr",
+            contents: {},
+            items: [
+              {
+                id: `${id}-cron`,
+                type: "cronExpr",
+                contents: { cn: "0 9 * * 1-5", en: "0 9 * * 1-5" },
+                labels: {},
                 on_finish: null,
                 img: null,
               },
@@ -76,7 +95,8 @@ describe("useAutomationTemplates", () => {
     });
 
     expect(result.current.loading).toBe(false);
-    expect(result.current.offPeak[0]?.id).toBe("item-loaded");
+    // BYOK fork P1a：offPeak 目录已删除，改用 scheduled 场景验证同一加载语义。
+    expect(result.current.scheduled[0]?.id).toBe("item-loaded");
   });
 
   it("returns an empty remote catalog when Client Scenes fails", async () => {
@@ -87,7 +107,6 @@ describe("useAutomationTemplates", () => {
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.scheduled).toEqual([]);
-    expect(result.current.offPeak).toEqual([]);
     expect(loggerWarn).toHaveBeenCalledWith(
       "[automation-templates] Client Scenes 请求失败，保留手动创建入口",
       { error: "offline" },
@@ -106,7 +125,6 @@ describe("useAutomationTemplates", () => {
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.scheduled).toEqual([]);
-    expect(result.current.offPeak).toEqual([]);
   });
 
   it("ignores a late response from the previous service attachment", async () => {
@@ -124,14 +142,14 @@ describe("useAutomationTemplates", () => {
     );
 
     rerender({ currentService: second });
-    await waitFor(() => expect(result.current.offPeak[0]?.id).toBe("item-new"));
+    await waitFor(() => expect(result.current.scheduled[0]?.id).toBe("item-new"));
     expect(result.current.loading).toBe(false);
     await act(async () => {
       resolveFirst(offPeakResponse("item-old", "Old"));
       await Promise.resolve();
     });
 
-    expect(result.current.offPeak[0]?.id).toBe("item-new");
+    expect(result.current.scheduled[0]?.id).toBe("item-new");
     expect(result.current.loading).toBe(false);
   });
 });
