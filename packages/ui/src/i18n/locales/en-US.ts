@@ -1740,7 +1740,6 @@ const enUS: Record<string, string> = {
   "remote.phaseSub.handshakeDone": "systemd --user · port {port}",
   "remote.phaseSub.readyOnline": "Device online; workspace history ready",
   "remote.sourceServerInstallCancelled": "Installation cancelled. You can retry when ready.",
-  "webRemoteControl.trigger": "Mobile remote control",
   "webRemoteControl.triggerStatus.idle": "Remote control is off",
   "webRemoteControl.triggerStatus.starting": "Remote control is starting",
   "webRemoteControl.triggerStatus.waiting": "Waiting for phone",
@@ -1751,9 +1750,6 @@ const enUS: Record<string, string> = {
   "webRemoteControl.authRequired.description":
     "Sign in to control this computer from your phone. Use the same account on both devices.",
   "webRemoteControl.authRequired.login": "Sign in",
-  "webRemoteControl.title": "Mobile remote control",
-  "webRemoteControl.description":
-    "Scan the QR code or open the link on your phone to control this workspace.",
   "webRemoteControl.statusLabel": "Session status",
   "webRemoteControl.status.idle": "Idle",
   "webRemoteControl.status.starting": "Starting",

@@ -1,11 +1,11 @@
 /* BYOK A2：侧栏「手机远程」快捷入口的弹窗。
  * 官方中继删除后，手机远控走自托管链路（设置 → 远程访问 / webRemoteAccess）。
- * 本弹窗把「看二维码」从设置页四步缩为一步：
- * - open / cloudflare-access：直接展示 externalBaseUrl 的 QR；
- * - token：一键重新生成并展示新 token 链接（旧 token 立即失效）；
- * - 未启用：引导去设置页。数据面全部复用 remoteAccessAdapter（desktop IPC）。 */
-import { useCallback, useEffect, useState } from "react";
-import { LoaderCircle, MonitorSmartphone } from "lucide-react";
+ * 本弹窗把「看二维码」从设置页四步缩为一步，视觉形态对齐参考实现
+ * （旧 fork WebRemoteControlDialog 的图标头卡 + 分区卡片，见 zCode v3.99.0），
+ * 但内容不同：参考版弹 Bot 渠道列表（P1c 已删），这里弹自托管二维码。
+ * 数据面复用 remoteAccessAdapter 的 desktop IPC（webRemoteAccess）。 */
+import { memo, useCallback, useEffect, useState } from "react";
+import { LoaderCircle, MonitorSmartphone, QrCode as QrCodeIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import {
   Dialog,
@@ -16,17 +16,16 @@ import {
 } from "@/components/ui/dialog.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
+import { useTabStoreApi } from "@/store/TabStoreProvider.js";
 import { logger } from "@/logger.js";
 import { QrCode } from "@/settings/QrCode.js";
-import { setPendingSettingsSectionIntent } from "@/lib/settingsNavigation.js";
 import { toast } from "@/components/ui/toast.js";
-import { useTabStoreApi } from "@/store/TabStoreProvider.js";
+import { setPendingSettingsSectionIntent } from "@/lib/settingsNavigation.js";
+import type { WebRemoteAccessStatus } from "@zcode/shared";
 
 interface QuickAccessState {
   phase: "loading" | "ready" | "error";
-  enabled: boolean;
-  mode: "open" | "cloudflare-access" | "token";
-  externalBaseUrl: string;
+  status: WebRemoteAccessStatus | null;
   /** token 模式重新生成后的一次性明文链接。 */
   regeneratedUrl: string | null;
   errorDetail: string | null;
@@ -34,14 +33,12 @@ interface QuickAccessState {
 
 const INITIAL_STATE: QuickAccessState = {
   phase: "loading",
-  enabled: false,
-  mode: "open",
-  externalBaseUrl: "",
+  status: null,
   regeneratedUrl: null,
   errorDetail: null,
 };
 
-export function RemoteAccessQuickDialog({
+export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComponent({
   open,
   onOpenChange,
 }: {
@@ -54,6 +51,7 @@ export function RemoteAccessQuickDialog({
   const tabStoreApi = useTabStoreApi();
   const [state, setState] = useState<QuickAccessState>(INITIAL_STATE);
   const [regenerating, setRegenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -77,9 +75,7 @@ export function RemoteAccessQuickDialog({
         if (cancelled) return;
         setState({
           phase: "ready",
-          enabled: snapshot.status.enabled,
-          mode: snapshot.status.mode,
-          externalBaseUrl: snapshot.status.externalBaseUrl,
+          status: snapshot.status,
           regeneratedUrl: null,
           errorDetail: null,
         });
@@ -97,18 +93,20 @@ export function RemoteAccessQuickDialog({
 
   const regenerateTokenUrl = useCallback(async () => {
     const bridge = platform.webRemoteAccess;
-    if (!bridge) return;
+    const current = state.status;
+    if (!bridge || !current) return;
     setRegenerating(true);
+    setCopied(false);
     try {
       const result = await bridge.saveConfig({
-        mode: state.mode,
+        mode: current.mode,
         // cf*/externalBaseUrl 缺省保留当前配置（controller 的 ?? 语义），
         // 只做 regenerate，避免一键换码时清掉用户已存的 CF/基址设置。
         regenerate: true,
         desktopEnabled: true,
       });
-      setState((current) => ({
-        ...current,
+      setState((prev) => ({
+        ...prev,
         regeneratedUrl: result.accessUrl ?? null,
       }));
     } catch (error) {
@@ -118,7 +116,20 @@ export function RemoteAccessQuickDialog({
     } finally {
       setRegenerating(false);
     }
-  }, [intl, platform, state.mode]);
+  }, [intl, platform, state.status]);
+
+  const copyLink = useCallback(
+    async (value: string) => {
+      try {
+        await navigator.clipboard.writeText(value);
+        setCopied(true);
+        toast(formatMessage("settings.remoteAccess.copied"));
+      } catch {
+        toast(formatMessage("settings.remoteAccess.copyFailed"));
+      }
+    },
+    [formatMessage],
+  );
 
   const openSettingsRemoteAccess = useCallback(() => {
     onOpenChange(false);
@@ -126,10 +137,16 @@ export function RemoteAccessQuickDialog({
     tabStoreApi.getState().openSettingsTab();
   }, [onOpenChange, tabStoreApi]);
 
+  const status = state.status;
+  const accessUrl =
+    state.regeneratedUrl ??
+    (status?.externalBaseUrl ? status.externalBaseUrl.replace(/\/+$/, "") : "");
+  const tokenReady = status?.enabled && status.mode === "token" && state.regeneratedUrl;
+
   const renderBody = () => {
     if (state.phase === "loading") {
       return (
-        <div className="flex items-center gap-2 px-1 py-6 text-ui-base text-foreground-subtle">
+        <div className="flex items-center gap-2 py-8 text-ui-base text-foreground-subtle">
           <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
           {formatMessage("settings.remoteAccess.loading")}
         </div>
@@ -137,118 +154,155 @@ export function RemoteAccessQuickDialog({
     }
     if (state.phase === "error") {
       return (
-        <div className="space-y-3">
-          <p className="text-ui-base text-foreground-subtle">
+        <section className="flex min-h-[220px] flex-col justify-center gap-3 rounded-xl border border-border bg-card p-4">
+          <p className="text-ui-base/relaxed text-foreground-subtle">
             {formatMessage("settings.remoteAccess.loadFailed")}
             {state.errorDetail ? `（${state.errorDetail}）` : null}
           </p>
           <Button type="button" variant="outline" onClick={openSettingsRemoteAccess}>
             {formatMessage("settings.remoteAccess.quick.goSettings")}
           </Button>
-        </div>
+        </section>
       );
     }
-    if (!state.enabled) {
+    if (!status?.enabled) {
       return (
-        <div className="space-y-3">
-          <p className="text-ui-base text-foreground-subtle">
+        <section className="flex min-h-[220px] flex-col justify-center gap-3 rounded-xl border border-border bg-card p-4">
+          <p className="text-ui-base/relaxed text-foreground-subtle">
             {formatMessage("settings.remoteAccess.quick.disabledHint")}
           </p>
           <Button type="button" onClick={openSettingsRemoteAccess}>
             {formatMessage("settings.remoteAccess.quick.goSettings")}
           </Button>
-        </div>
+        </section>
       );
     }
-    if (state.mode === "token") {
+    if (status.mode === "token" && !tokenReady) {
       return (
-        <div className="space-y-3">
-          {state.regeneratedUrl ? (
-            <div className="flex items-start gap-4">
-              <QrCode value={state.regeneratedUrl} size={168} />
-              <div className="flex min-w-0 flex-col gap-2">
-                <div className="break-all font-mono text-ui-xs text-foreground-subtle">
-                  {state.regeneratedUrl}
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void navigator.clipboard.writeText(state.regeneratedUrl ?? "")}
-                >
-                  {formatMessage("settings.remoteAccess.copyLink")}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <p className="text-ui-base text-foreground-subtle">
-              {formatMessage("settings.remoteAccess.quick.tokenHint")}
-            </p>
-          )}
+        <section className="flex min-h-[220px] flex-col justify-center gap-3 rounded-xl border border-border bg-card p-4">
+          <p className="text-ui-base/relaxed text-foreground-subtle">
+            {formatMessage("settings.remoteAccess.quick.tokenHint")}
+          </p>
           <Button
             type="button"
-            variant="outline"
+            disabled={regenerating}
+            onClick={() => void regenerateTokenUrl()}
+          >
+            {regenerating ? (
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <QrCodeIcon className="size-4" aria-hidden="true" />
+            )}
+            {formatMessage(
+              status.hasToken
+                ? "settings.remoteAccess.token.regenerate"
+                : "settings.remoteAccess.token.generate",
+            )}
+          </Button>
+        </section>
+      );
+    }
+    if (!accessUrl) {
+      return (
+        <section className="flex min-h-[220px] flex-col justify-center gap-3 rounded-xl border border-border bg-card p-4">
+          <p className="text-ui-base/relaxed text-foreground-subtle">
+            {formatMessage("settings.remoteAccess.quick.noBaseUrlHint")}
+          </p>
+          <Button type="button" onClick={openSettingsRemoteAccess}>
+            {formatMessage("settings.remoteAccess.quick.goSettings")}
+          </Button>
+        </section>
+      );
+    }
+    return (
+      <section className="flex flex-col items-center gap-4 rounded-xl border border-border bg-card p-5">
+        <QrCode value={accessUrl} size={192} />
+        <div className="w-full break-all rounded-md bg-surface px-3 py-2 text-center font-mono text-ui-xs text-foreground-subtle">
+          {accessUrl}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="w-full justify-center"
+          onClick={() => void copyLink(accessUrl)}
+        >
+          {formatMessage("settings.remoteAccess.copyLink")}
+        </Button>
+        {status.mode === "token" ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             disabled={regenerating}
             onClick={() => void regenerateTokenUrl()}
           >
             {regenerating ? (
               <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
             ) : null}
-            {formatMessage(
-              state.regeneratedUrl
-                ? "settings.remoteAccess.token.regenerate"
-                : "settings.remoteAccess.token.generate",
-            )}
+            {formatMessage("settings.remoteAccess.token.regenerate")}
           </Button>
-        </div>
-      );
-    }
-    // open / cloudflare-access：链接即入口（CF 的认证在边缘完成）。
-    if (!state.externalBaseUrl) {
-      return (
-        <div className="space-y-3">
-          <p className="text-ui-base text-foreground-subtle">
-            {formatMessage("settings.remoteAccess.quick.noBaseUrlHint")}
-          </p>
-          <Button type="button" onClick={openSettingsRemoteAccess}>
-            {formatMessage("settings.remoteAccess.quick.goSettings")}
-          </Button>
-        </div>
-      );
-    }
-    const url = state.externalBaseUrl.replace(/\/+$/, "");
-    return (
-      <div className="flex items-start gap-4">
-        <QrCode value={url} size={168} />
-        <div className="flex min-w-0 flex-col gap-2">
-          <div className="break-all font-mono text-ui-xs text-foreground-subtle">{url}</div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void navigator.clipboard.writeText(url)}
-          >
-            {formatMessage("settings.remoteAccess.copyLink")}
-          </Button>
-        </div>
-      </div>
+        ) : null}
+        {copied ? (
+          <span className="text-ui-xs text-foreground-subtle">
+            {formatMessage("settings.remoteAccess.copied")}
+          </span>
+        ) : null}
+      </section>
     );
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MonitorSmartphone className="size-4" aria-hidden="true" />
-            {formatMessage("settings.remoteAccess.quick.title")}
-          </DialogTitle>
-          <DialogDescription>
-            {formatMessage("settings.remoteAccess.quick.description")}
-          </DialogDescription>
-        </DialogHeader>
-        {renderBody()}
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[calc(100vh-6rem)] max-w-lg gap-0 overflow-hidden rounded-2xl p-0"
+      >
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute top-2 right-2 enabled:cursor-pointer [app-region:no-drag]"
+          onClick={() => onOpenChange(false)}
+        >
+          <XIcon />
+          <span className="sr-only">Close</span>
+        </Button>
+        <div className="max-h-[calc(100vh-6rem)] min-h-0 overflow-y-auto p-5">
+          <DialogHeader className="space-y-2 pr-8">
+            <div className="flex items-center gap-2">
+              <div className="flex size-10 items-center justify-center rounded-lg border border-border bg-surface text-primary">
+                <MonitorSmartphone className="size-5" />
+              </div>
+              <div className="space-y-1">
+                <DialogTitle>
+                  {formatMessage("settings.remoteAccess.quick.title")}
+                </DialogTitle>
+                <DialogDescription>
+                  {formatMessage("settings.remoteAccess.quick.description")}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="mt-5">{renderBody()}</div>
+          <div className="mt-3 flex items-center justify-between">
+            <span className="text-ui-xs text-foreground-subtle">
+              {status?.running
+                ? formatMessage("settings.remoteAccess.quick.runningHint")
+                : formatMessage("settings.remoteAccess.quick.stoppedHint")}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="enabled:cursor-pointer"
+              onClick={openSettingsRemoteAccess}
+            >
+              {formatMessage("settings.remoteAccess.quick.goSettings")}
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
-}
+});

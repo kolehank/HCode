@@ -1641,7 +1641,6 @@ const zhCN: Record<string, string> = {
   "remote.phaseSub.handshakeDone": "服务端口 {port}",
   "remote.phaseSub.readyOnline": "设备已上线，工作区历史已就绪",
   "remote.sourceServerInstallCancelled": "已取消安装，准备好后可以重试。",
-  "webRemoteControl.trigger": "移动端远程控制",
   "webRemoteControl.triggerStatus.idle": "远程控制未开启",
   "webRemoteControl.triggerStatus.starting": "远程控制启动中",
   "webRemoteControl.triggerStatus.waiting": "等待手机连接",
@@ -1652,8 +1651,6 @@ const zhCN: Record<string, string> = {
   "webRemoteControl.authRequired.description":
     "登录后即可使用手机远程控制。手机和电脑需登录同一账号。",
   "webRemoteControl.authRequired.login": "登录",
-  "webRemoteControl.title": "移动端远程控制",
-  "webRemoteControl.description": "扫码或在手机上打开链接，即可远程控制当前工作区。",
   "webRemoteControl.statusLabel": "会话状态",
   "webRemoteControl.status.idle": "未开启",
   "webRemoteControl.status.starting": "启动中",
