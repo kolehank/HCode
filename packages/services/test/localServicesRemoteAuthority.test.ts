@@ -82,13 +82,19 @@ describe("createLocalServices remote authority", () => {
     process.env.ZCODE_CREDENTIAL_SECRET = originalCredentialSecret ?? "test-credential-secret";
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     process.env.HOME = originalHome;
     // BYOK fork：P2 主密钥默认走 OS keychain（测试进程会弹钥匙串授权），
     // 统一用显式覆盖的 ZCODE_CREDENTIAL_SECRET 保证单测确定性。
     process.env.ZCODE_CREDENTIAL_SECRET = originalCredentialSecret ?? "test-credential-secret";
     vi.restoreAllMocks();
     vi.resetModules();
+    // Bugfix（CI run 40104032474 门禁）：createLocalServices 拉起的 service logger
+    // 在用例结束后仍有在途 console 输出，慢机上 worker teardown（Closing rpc）会先
+    // 于 flush 发生，Vitest 把 "onUserConsoleLog was pending" 记为 Unhandled
+    // Rejection 直接 fail（15648 用例全过仍 exit 1）。afterEach 里让出两个宏任务
+    // 排空在途输出，再进入临时目录清理。
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
     for (const home of tempHomes.splice(0)) {
       // 根因：Windows 删除目录必须先关闭其下所有句柄，而 service 释放（日志文件、
       // 配置 watcher、SQLite 句柄）是异步收口的，`force: true` 并不会重试——它只吞
