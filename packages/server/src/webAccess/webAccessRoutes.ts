@@ -4,10 +4,12 @@ import { Hono } from "hono";
 import { createServiceLogger } from "@zcode/services/node";
 import { formatZodError } from "@zcode/shared";
 import {
+  buildAccessUrl,
   generateWebAccessToken,
   loadWebAccessConfig,
   sanitizeWebAccessConfig,
   updateWebAccessConfig,
+  validateWebAccessUpdateCrossFields,
   webAccessUpdateSchema,
   type WebAccessConfig,
 } from "./webAccessConfig.js";
@@ -31,7 +33,8 @@ export interface WebAccessInterfaceInfo {
 }
 
 // docker0 / veth* / vEthernet(WSL) / Hyper-V / VMware / VirtualBox / ve- 等虚拟网卡不进入候选。
-const VIRTUAL_INTERFACE_NAME_PATTERN = /^(docker|br-|veth|vethernet|wsl|hyper-v|vmware|virtualbox|ve-)/i;
+const VIRTUAL_INTERFACE_NAME_PATTERN =
+  /^(docker|br-|veth|vethernet|wsl|hyper-v|vmware|virtualbox|ve-)/i;
 
 function isTailscaleIpv4(address: string): boolean {
   const parts = address.split(".").map((part) => Number(part));
@@ -46,7 +49,10 @@ function isTailscaleIpv4(address: string): boolean {
 
 function isPrivateIpv4(address: string): boolean {
   const parts = address.split(".").map((part) => Number(part));
-  if (parts.length !== 4 || !parts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255)) {
+  if (
+    parts.length !== 4 ||
+    !parts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255)
+  ) {
     return false;
   }
   const [first, second] = parts;
@@ -90,7 +96,9 @@ export function listWebAccessInterfaces(): WebAccessInterfaceInfo[] {
 
   const suggested =
     candidates.find((candidate) => candidate.isTailscale) ??
-    candidates.find((candidate) => candidate.family === "IPv4" && isPrivateIpv4(candidate.address)) ??
+    candidates.find(
+      (candidate) => candidate.family === "IPv4" && isPrivateIpv4(candidate.address),
+    ) ??
     candidates.find((candidate) => candidate.family === "IPv4") ??
     candidates[0];
   if (suggested) {
@@ -99,7 +107,10 @@ export function listWebAccessInterfaces(): WebAccessInterfaceInfo[] {
   return candidates;
 }
 
-function isRequestBodyAllowed(options: WebAccessRouteOptions, remoteAddress: string | undefined): boolean {
+function isRequestBodyAllowed(
+  options: WebAccessRouteOptions,
+  remoteAddress: string | undefined,
+): boolean {
   // token / cloudflare-access 档已由全局中间件鉴权；open 档（含 legacy env token 未配置时）
   // 配置写接口与网卡探测只允许本机回环访问，防止未认证请求改配置或扫内网拓扑。
   if (options.startupConfig.mode !== "open") {
@@ -108,18 +119,9 @@ function isRequestBodyAllowed(options: WebAccessRouteOptions, remoteAddress: str
   return isLoopbackRemoteAddress(remoteAddress);
 }
 
-function buildAccessUrl(externalBaseUrl: string, token: string): string | undefined {
-  const trimmed = externalBaseUrl.trim().replace(/\/+$/, "");
-  if (!trimmed) {
-    return undefined;
-  }
-  return `${trimmed}/#token=${token}`;
-}
-
 export function registerWebAccessRoutes(app: Hono, options: WebAccessRouteOptions): void {
-  const requireLoopbackInOpenMode = async (
-    remoteAddress: string | undefined,
-  ): Promise<boolean> => isRequestBodyAllowed(options, remoteAddress);
+  const requireLoopbackInOpenMode = async (remoteAddress: string | undefined): Promise<boolean> =>
+    isRequestBodyAllowed(options, remoteAddress);
 
   app.get("/api/web-access/config", async (c) => {
     if (!(await requireLoopbackInOpenMode(getRequestRemoteAddress(c)))) {
@@ -145,17 +147,10 @@ export function registerWebAccessRoutes(app: Hono, options: WebAccessRouteOption
       return c.json({ error: `Invalid request body: ${formatZodError(parsed.error)}` }, 400);
     }
     const body = parsed.data;
-
-    if (body.mode === "cloudflare-access") {
-      if (!body.cfTeamDomain.trim() || !body.cfAud.trim()) {
-        return c.json({ error: "cloudflare-access requires cfTeamDomain and cfAud" }, 400);
-      }
-      if (/\/|^https?:/i.test(body.cfTeamDomain.trim())) {
-        return c.json({ error: "cfTeamDomain must be a bare hostname" }, 400);
-      }
-    }
-    if (body.externalBaseUrl.trim() && !/^https?:\/\//i.test(body.externalBaseUrl.trim())) {
-      return c.json({ error: "externalBaseUrl must start with http:// or https://" }, 400);
+    // 跨字段校验单一来源在 webAccessConfig（desktop 内嵌路由共用同一实现）。
+    const crossFieldError = validateWebAccessUpdateCrossFields(body);
+    if (crossFieldError) {
+      return c.json({ error: crossFieldError }, 400);
     }
 
     // token 档没有可用 token，或显式 regenerate：生成新 token（旧 token 在重启后失效），

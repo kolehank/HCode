@@ -5,6 +5,7 @@ export { createHttpServer } from "./http.js";
 // 内嵌 HTTP/WS 入口与设置页 IPC 数据源复用。
 export {
   WEB_ACCESS_MODES,
+  buildAccessUrl,
   loadWebAccessConfig,
   updateWebAccessConfig,
   sanitizeWebAccessConfig,
@@ -12,6 +13,7 @@ export {
   tokenMatchesHash,
   resolveWebBindHost,
   getDefaultWebAccessConfig,
+  validateWebAccessUpdateCrossFields,
   webAccessUpdateSchema,
   isLoopbackHost,
 } from "./webAccess/webAccessConfig.js";
@@ -34,4 +36,7 @@ export {
 // BYOK A2：网卡枚举与过滤规则单一所有者在 server（web 形态同一套建议逻辑），
 // desktop 设置页 IPC 直接复用，避免两份虚拟网卡名单漂移。
 // 注意：该模块含 hono 路由；desktop main bundle 本就整体内联 @zcode/server，无额外体积增量。
-export { listWebAccessInterfaces, type WebAccessInterfaceInfo } from "./webAccess/webAccessRoutes.js";
+export {
+  listWebAccessInterfaces,
+  type WebAccessInterfaceInfo,
+} from "./webAccess/webAccessRoutes.js";

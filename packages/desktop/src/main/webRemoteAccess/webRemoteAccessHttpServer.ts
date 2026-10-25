@@ -7,14 +7,23 @@ import { stat } from "node:fs/promises";
 import { extname, join, relative, sep } from "node:path";
 import type { Socket } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
+import { formatZodError } from "@zcode/shared";
 import type { WebAccessConfig } from "@zcode/server";
 import {
   authorizeRequest,
+  buildAccessUrl,
+  generateWebAccessToken,
   isAllowedWsOrigin,
   isLoopbackRemoteAddress,
   isLoopbackWsHostHeader,
   isTokenProtectedPath,
+  listWebAccessInterfaces,
+  loadWebAccessConfig,
+  sanitizeWebAccessConfig,
+  updateWebAccessConfig,
+  validateWebAccessUpdateCrossFields,
   verifyCloudflareAccessJwt,
+  webAccessUpdateSchema,
 } from "@zcode/server";
 
 /** Cf-Access-Jwt-Assertion 等头在 Node http 里可能是 string[]；校验只认第一个值。 */
@@ -32,6 +41,11 @@ export interface WebRemoteAccessHttpServerOptions {
   webStaticDir: string | undefined;
   /** WS 升级完成后的客户端接入回调（electron 适配层注入 MessagePort 桥）。 */
   onClientConnected: (ws: WebSocket) => void;
+  /**
+   * PUT /api/web-access/config 落盘成功且响应已回包后触发（desktop 传入 controller 的
+   * 停旧起新重建入口）。必须在响应 end 回调里调用：stop 会终止包括当前连接在内的全部 socket。
+   */
+  onConfigUpdated?: () => void;
   logger: {
     info: (...args: unknown[]) => void;
     warn: (...args: unknown[]) => void;
@@ -175,11 +189,7 @@ export function startWebRemoteAccessHttpServer(
         return;
       }
       if (
-        !isAllowedWsOrigin(
-          firstHeaderValue(req.headers.origin),
-          guardHost,
-          config.externalBaseUrl,
-        )
+        !isAllowedWsOrigin(firstHeaderValue(req.headers.origin), guardHost, config.externalBaseUrl)
       ) {
         json(res, 403, { error: "cross-origin request is not allowed" });
         return;
@@ -190,15 +200,7 @@ export function startWebRemoteAccessHttpServer(
           json(res, auth.status, { error: auth.detail });
           return;
         }
-        // 配置写接口仍只允许 loopback（本机设置页），远程只读。
-        if (
-          pathname.startsWith("/api/web-access") &&
-          req.method !== "GET" &&
-          !isLoopbackRemoteAddress(requestLike.remoteAddress)
-        ) {
-          json(res, 403, { error: "web access config writes require loopback" });
-          return;
-        }
+        // /api/web-access 的读写粒度 loopback 约束在下方 API 分发器统一执行。
       } else if (config.mode === "cloudflare-access") {
         const result = await verifyCloudflareAccessJwt(
           firstHeaderValue(req.headers["cf-access-jwt-assertion"]),
@@ -211,11 +213,148 @@ export function startWebRemoteAccessHttpServer(
       }
     }
 
+    // /api 空间只挂载 web-access 配置面（open/token 档），未挂载路径一律 404 JSON——
+    // 不能落入 SPA fallback：浏览器端会把 index.html 当 JSON 解析，报「Unexpected token '<'」。
+    if (pathname === "/api" || pathname.startsWith("/api/")) {
+      await handleApiRequest(req, res, pathname, requestLike);
+      return;
+    }
+
     if (options.webStaticDir) {
       await serveStaticFile(res, options.webStaticDir, pathname);
       return;
     }
     res.writeHead(404, STATIC_SECURITY_HEADERS).end("web static root is not configured");
+  }
+
+  /**
+   * /api/web-access 配置面（desktop 挂载 open/token 档；CF 档不挂载，见 spec 鉴权矩阵）。
+   * 读写约束与 server 形态对齐：open 档全接口仅 loopback（未鉴权挡探测）；
+   * token 档 GET 凭据放行（远程只读），写接口仅 loopback（本机设置页）。
+   * 配置读写都直接走 @zcode/server（磁盘 web-access.json 唯一事实），不经 controller 缓存。
+   */
+  async function handleApiRequest(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pathname: string,
+    requestLike: {
+      method: string | undefined;
+      url: string;
+      headers: Record<string, string | undefined>;
+      remoteAddress: string | undefined;
+    },
+  ): Promise<void> {
+    if (config.mode !== "open" && config.mode !== "token") {
+      json(res, 404, { error: "not found" });
+      return;
+    }
+    if (!pathname.startsWith("/api/web-access")) {
+      json(res, 404, { error: "not found" });
+      return;
+    }
+    const isWrite = req.method !== "GET";
+    const loopbackRequired = config.mode === "open" || isWrite;
+    if (loopbackRequired && !isLoopbackRemoteAddress(requestLike.remoteAddress)) {
+      json(res, 403, { error: "web access config requires loopback" });
+      return;
+    }
+
+    if (pathname === "/api/web-access/config" && req.method === "GET") {
+      const current = await loadWebAccessConfig();
+      json(res, 200, { ...sanitizeWebAccessConfig(current), port: listeningPort });
+      return;
+    }
+    if (pathname === "/api/web-access/interfaces" && req.method === "GET") {
+      json(res, 200, { interfaces: listWebAccessInterfaces(), port: listeningPort });
+      return;
+    }
+    if (pathname === "/api/web-access/config" && req.method === "PUT") {
+      await handleConfigPut(req, res);
+      return;
+    }
+    json(res, 404, { error: "not found" });
+  }
+
+  /** PUT 请求体上限：schema 各字段有界，超限直接拒绝，不给 main 进程缓冲机会。 */
+  const MAX_PUT_BODY_BYTES = 1024 * 1024;
+
+  async function handleConfigPut(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for await (const chunk of req) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as ArrayBuffer);
+      total += buf.length;
+      if (total > MAX_PUT_BODY_BYTES) {
+        json(res, 413, { error: "request body too large" });
+        return;
+      }
+      chunks.push(buf);
+    }
+    let rawBody: unknown;
+    try {
+      rawBody = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+    } catch {
+      json(res, 400, { error: "Invalid JSON body" });
+      return;
+    }
+    const parsed = webAccessUpdateSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      json(res, 400, { error: `Invalid request body: ${formatZodError(parsed.error)}` });
+      return;
+    }
+    const body = parsed.data;
+    const crossFieldError = validateWebAccessUpdateCrossFields(body);
+    if (crossFieldError) {
+      json(res, 400, { error: crossFieldError });
+      return;
+    }
+
+    // token 档没有可用 token，或显式 regenerate：生成新 token（旧 token 在重启后失效）。
+    let generated: { token: string; tokenHash: string; tokenPrefix: string } | undefined;
+    if (body.mode === "token") {
+      const existing = await loadWebAccessConfig();
+      if (body.regenerate || !existing.tokenHash) {
+        generated = generateWebAccessToken();
+      }
+    }
+
+    try {
+      const next = await updateWebAccessConfig((current) => ({
+        ...current,
+        mode: body.mode,
+        cfTeamDomain: body.cfTeamDomain.trim(),
+        cfAud: body.cfAud.trim(),
+        cfAllowedEmails: body.cfAllowedEmails.map((email) => email.trim()).filter(Boolean),
+        externalBaseUrl: body.externalBaseUrl.trim(),
+        ...(generated
+          ? { tokenHash: generated.tokenHash, tokenPrefix: generated.tokenPrefix }
+          : {}),
+      }));
+      logger.info(
+        `[web-remote-access] config updated via http mode=${next.mode} tokenPrefix=${next.tokenPrefix} tokenRegenerated=${Boolean(generated)}`,
+      );
+      // 先回包再触发重建：onConfigUpdated 会 stop 本监听器（含当前连接），
+      // 回包必须已完成。end 回调失败（连接早断）时本轮不重建，磁盘事实由
+      // 后续生命周期操作或下次启动重同步（见 spec 生命周期节）。
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(
+        JSON.stringify({
+          ...sanitizeWebAccessConfig(next),
+          port: listeningPort,
+          ...(generated
+            ? {
+                token: generated.token,
+                accessUrl: buildAccessUrl(next.externalBaseUrl, generated.token),
+              }
+            : {}),
+        }),
+        () => {
+          options.onConfigUpdated?.();
+        },
+      );
+    } catch (error) {
+      json(res, 500, { error: error instanceof Error ? error.message : String(error) });
+    }
   }
 
   const wss = new WebSocketServer({
@@ -290,12 +429,16 @@ export function startWebRemoteAccessHttpServer(
     proceed();
   });
 
+  // /api/web-access 响应里的 port 字段：配置端口可能为 0（临时端口），以实际监听值为准。
+  let listeningPort = options.port;
+
   return new Promise((resolvePromise, rejectPromise) => {
     server.once("error", rejectPromise);
     server.listen(options.port, options.bindHost, () => {
       server.removeListener("error", rejectPromise);
       const address = server.address();
       const actualPort = typeof address === "object" && address ? address.port : options.port;
+      listeningPort = actualPort;
       logger.info(
         `[web-remote-access] listening mode=${config.mode} bind=${options.bindHost} port=${actualPort}`,
       );
@@ -317,4 +460,3 @@ export function startWebRemoteAccessHttpServer(
     });
   });
 }
-

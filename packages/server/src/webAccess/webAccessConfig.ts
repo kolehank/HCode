@@ -2,11 +2,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  atomicWritePrivateTextFile,
-  backupCorruptFile,
-  withFileLock,
-} from "@zcode/shared/node";
+import { atomicWritePrivateTextFile, backupCorruptFile, withFileLock } from "@zcode/shared/node";
 import { getAppConfigDir } from "@zcode/services/node";
 import { formatZodError } from "@zcode/shared";
 import { createServiceLogger } from "@zcode/services/node";
@@ -34,7 +30,11 @@ export interface WebAccessConfig {
 const webAccessFileSchema = z.object({
   schemaVersion: z.literal(1),
   mode: z.enum(WEB_ACCESS_MODES),
-  tokenHash: z.string().regex(/^[0-9a-f]{64}$/).or(z.literal("")).default(""),
+  tokenHash: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .or(z.literal(""))
+    .default(""),
   tokenPrefix: z.string().max(32).default(""),
   cfTeamDomain: z.string().max(253).default(""),
   cfAud: z.string().max(256).default(""),
@@ -54,6 +54,35 @@ export const webAccessUpdateSchema = z.object({
   regenerate: z.boolean().default(false),
 });
 export type WebAccessUpdateInput = z.infer<typeof webAccessUpdateSchema>;
+
+/**
+ * PUT 入参的跨字段校验（server 形态路由与 desktop 内嵌路由共用的单一实现）：
+ * CF 档域名/AUD 必填且为裸主机名；externalBaseUrl 配置时必须是 http(s) URL。
+ * 返回错误消息，null 表示通过。
+ */
+export function validateWebAccessUpdateCrossFields(body: WebAccessUpdateInput): string | null {
+  if (body.mode === "cloudflare-access") {
+    if (!body.cfTeamDomain.trim() || !body.cfAud.trim()) {
+      return "cloudflare-access requires cfTeamDomain and cfAud";
+    }
+    if (/\/|^https?:/i.test(body.cfTeamDomain.trim())) {
+      return "cfTeamDomain must be a bare hostname";
+    }
+  }
+  if (body.externalBaseUrl.trim() && !/^https?:\/\//i.test(body.externalBaseUrl.trim())) {
+    return "externalBaseUrl must start with http:// or https://";
+  }
+  return null;
+}
+
+/** 拼访问链接：externalBaseUrl + 一次性明文 token。baseUrl 未配置时不返回链接。 */
+export function buildAccessUrl(externalBaseUrl: string, token: string): string | undefined {
+  const trimmed = externalBaseUrl.trim().replace(/\/+$/, "");
+  if (!trimmed) {
+    return undefined;
+  }
+  return `${trimmed}/#token=${token}`;
+}
 
 export function getDefaultWebAccessConfig(): WebAccessConfig {
   return {
@@ -78,7 +107,11 @@ export function sha256Hex(value: string): string {
 }
 
 /** token 明文只在生成时刻返回给调用方一次；文件里只保留 hash 与前缀。 */
-export function generateWebAccessToken(): { token: string; tokenHash: string; tokenPrefix: string } {
+export function generateWebAccessToken(): {
+  token: string;
+  tokenHash: string;
+  tokenPrefix: string;
+} {
   const token = randomBytes(32).toString("base64url");
   return { token, tokenHash: sha256Hex(token), tokenPrefix: token.slice(0, 8) };
 }

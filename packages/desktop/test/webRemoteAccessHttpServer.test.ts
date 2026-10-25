@@ -15,6 +15,7 @@ import {
   startWebRemoteAccessHttpServer,
   type WebRemoteAccessHttpServerHandle,
 } from "../src/main/webRemoteAccess/webRemoteAccessHttpServer.js";
+import { setDataBaseDir } from "@zcode/services/node";
 
 interface TestFixture {
   handle: WebRemoteAccessHttpServerHandle;
@@ -32,6 +33,7 @@ function makeConfig(overrides: Partial<WebAccessConfig>): WebAccessConfig {
 async function startFixture(
   config: WebAccessConfig,
   onClientConnected: (ws: import("ws").WebSocket) => void = () => {},
+  onConfigUpdated?: () => void,
 ): Promise<TestFixture> {
   // staticDir 是 baseDir 的子目录：穿越测试需要一个位于静态根之外的同级文件。
   const baseDir = await mkdtemp(join(tmpdir(), "zcode-web-ra-test-"));
@@ -44,6 +46,7 @@ async function startFixture(
     port: 0,
     webStaticDir: staticDir,
     onClientConnected,
+    onConfigUpdated,
     logger: noopLogger,
   });
   const port = handle.port;
@@ -87,7 +90,11 @@ function rawUpgrade(
   });
 }
 
-function httpGet(port: number, path: string, headers: Record<string, string> = {}): Promise<{
+function httpGet(
+  port: number,
+  path: string,
+  headers: Record<string, string> = {},
+): Promise<{
   status?: number;
   headers: ServerResponse["headers"];
   body: string;
@@ -137,9 +144,7 @@ test("open 档：跨源 Origin 与非回环 Host 的升级被拒（CSWSH / rebin
 
 test("token 档：无 token 401，带 token 升级成功，token + 跨源 Origin 仍被拒", async () => {
   const generated = generateWebAccessToken();
-  const fixture = await startFixture(
-    makeConfig({ mode: "token", tokenHash: generated.tokenHash }),
-  );
+  const fixture = await startFixture(makeConfig({ mode: "token", tokenHash: generated.tokenHash }));
   onTestFinished(() => fixture.handle.stop());
   const noToken = await rawUpgrade(fixture.port, "/ws", {});
   assert.equal(noToken.status, 401);
@@ -208,10 +213,7 @@ test("静态资源：nosniff 安全头、SPA fallback、路径穿越不外泄", 
     "/x/../../zcode-ra-secret.txt",
   ]) {
     const result = await httpGet(fixture.port, attempt);
-    assert.ok(
-      !result.body.includes("TOPSECRET"),
-      `穿越尝试不应读到静态根之外的文件: ${attempt}`,
-    );
+    assert.ok(!result.body.includes("TOPSECRET"), `穿越尝试不应读到静态根之外的文件: ${attempt}`);
   }
 });
 
@@ -235,4 +237,192 @@ test("stop 在有在线客户端时必须在有限时间内 resolve（回归：�
   );
   await Promise.race([stopDone, timeout]);
   client.terminate();
+});
+
+/** PUT JSON 请求（本机设置页保存路径）。 */
+function httpPut(
+  port: number,
+  path: string,
+  body: string,
+  headers: Record<string, string> = {},
+): Promise<{ status?: number; headers: ServerResponse["headers"]; body: string }> {
+  return new Promise((resolve) => {
+    const req = request({
+      host: "127.0.0.1",
+      port,
+      path,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+    });
+    req.on("response", (res) => {
+      let data = "";
+      res.on("data", (chunk: Buffer) => (data += chunk.toString()));
+      res.on("end", () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
+    });
+    req.on("error", () => resolve({ headers: {}, body: "" }));
+    req.end(body);
+  });
+}
+
+/** PUT 测试要写 web-access.json：把数据根指到临时目录，测试结束后还原全局状态。 */
+function isolateConfigDir(baseDir: string): void {
+  setDataBaseDir(baseDir);
+  onTestFinished(() => setDataBaseDir(null));
+}
+
+/** GET 从磁盘读配置（与生产一致：controller 落盘后才启动 server）；测试需要先种子文件。 */
+async function seedConfigFile(baseDir: string, config: WebAccessConfig): Promise<void> {
+  const configDir = join(baseDir, ".zcode", "v2");
+  await mkdir(configDir, { recursive: true });
+  await writeFile(join(configDir, "web-access.json"), JSON.stringify(config));
+}
+
+test("open 档：GET config/interfaces 返回 JSON 视图，未挂载 /api 回 404 JSON 而非 SPA fallback", async () => {
+  const fixture = await startFixture(makeConfig({ mode: "open" }));
+  onTestFinished(async () => {
+    await rm(fixture.baseDir, { recursive: true, force: true });
+  });
+  const config = await httpGet(fixture.port, "/api/web-access/config");
+  assert.equal(config.status, 200);
+  assert.match(config.headers["content-type"] ?? "", /application\/json/);
+  const configBody = JSON.parse(config.body) as Record<string, unknown>;
+  assert.equal(configBody.mode, "open");
+  assert.equal(configBody.port, fixture.port);
+  assert.equal(configBody.hasToken, false);
+
+  const interfaces = await httpGet(fixture.port, "/api/web-access/interfaces");
+  assert.equal(interfaces.status, 200);
+  const interfacesBody = JSON.parse(interfaces.body) as { interfaces: unknown[]; port: number };
+  assert.ok(Array.isArray(interfacesBody.interfaces));
+  assert.equal(interfacesBody.port, fixture.port);
+
+  const unknownApi = await httpGet(fixture.port, "/api/unknown");
+  assert.equal(unknownApi.status, 404);
+  assert.match(unknownApi.headers["content-type"] ?? "", /application\/json/);
+  assert.deepEqual(JSON.parse(unknownApi.body), { error: "not found" });
+
+  const unknownWebAccessApi = await httpGet(fixture.port, "/api/web-access/whatever");
+  assert.equal(unknownWebAccessApi.status, 404);
+  assert.match(unknownWebAccessApi.headers["content-type"] ?? "", /application\/json/);
+
+  // SPA fallback 只服务非 /api 路径，行为不回退。
+  const spa = await httpGet(fixture.port, "/settings/remote-access");
+  assert.equal(spa.status, 200);
+  assert.match(spa.headers["content-type"] ?? "", /text\/html/);
+  assert.ok(spa.body.includes("index"));
+});
+
+test("open 档：本机浏览器 PUT 保存落盘（用户场景），非法入参 400", async () => {
+  const fixture = await startFixture(makeConfig({ mode: "open" }));
+  isolateConfigDir(fixture.baseDir);
+  onTestFinished(async () => {
+    await rm(fixture.baseDir, { recursive: true, force: true });
+  });
+
+  const saved = await httpPut(
+    fixture.port,
+    "/api/web-access/config",
+    JSON.stringify({
+      mode: "open",
+      cfTeamDomain: "",
+      cfAud: "",
+      cfAllowedEmails: [],
+      externalBaseUrl: "http://192.168.1.5:30330",
+      regenerate: false,
+    }),
+  );
+  assert.equal(saved.status, 200);
+  const savedBody = JSON.parse(saved.body) as { externalBaseUrl: string; mode: string };
+  assert.equal(savedBody.mode, "open");
+  assert.equal(savedBody.externalBaseUrl, "http://192.168.1.5:30330");
+
+  // 落盘事实经 GET 读回（loadWebAccessConfig 走同一磁盘文件）。
+  const readBack = await httpGet(fixture.port, "/api/web-access/config");
+  assert.equal(readBack.status, 200);
+  assert.equal(JSON.parse(readBack.body).externalBaseUrl, "http://192.168.1.5:30330");
+
+  const badUrl = await httpPut(
+    fixture.port,
+    "/api/web-access/config",
+    JSON.stringify({ mode: "open", externalBaseUrl: "ftp://example.com" }),
+  );
+  assert.equal(badUrl.status, 400);
+
+  const badJson = await httpPut(fixture.port, "/api/web-access/config", "{not-json");
+  assert.equal(badJson.status, 400);
+});
+
+test("token 档：GET 需凭据，PUT regenerate 返回一次性 token 并触发 onConfigUpdated", async () => {
+  const initial = generateWebAccessToken();
+  let configUpdatedCount = 0;
+  const fixture = await startFixture(
+    makeConfig({ mode: "token", tokenHash: initial.tokenHash, tokenPrefix: initial.tokenPrefix }),
+    () => {},
+    () => {
+      configUpdatedCount += 1;
+    },
+  );
+  isolateConfigDir(fixture.baseDir);
+  await seedConfigFile(
+    fixture.baseDir,
+    makeConfig({
+      mode: "token",
+      tokenHash: initial.tokenHash,
+      tokenPrefix: initial.tokenPrefix,
+    }),
+  );
+  onTestFinished(async () => {
+    await rm(fixture.baseDir, { recursive: true, force: true });
+  });
+
+  const unauthorized = await httpGet(fixture.port, "/api/web-access/config");
+  assert.equal(unauthorized.status, 401);
+
+  const readView = await httpGet(fixture.port, "/api/web-access/config", {
+    Authorization: `Bearer ${initial.token}`,
+  });
+  assert.equal(readView.status, 200);
+  assert.equal(JSON.parse(readView.body).tokenPrefix, initial.tokenPrefix);
+
+  const saved = await httpPut(
+    fixture.port,
+    "/api/web-access/config",
+    JSON.stringify({
+      mode: "token",
+      cfTeamDomain: "",
+      cfAud: "",
+      cfAllowedEmails: [],
+      externalBaseUrl: "http://192.168.1.9:30330",
+      regenerate: true,
+    }),
+    { Authorization: `Bearer ${initial.token}` },
+  );
+  assert.equal(saved.status, 200);
+  const savedBody = JSON.parse(saved.body) as {
+    token?: string;
+    accessUrl?: string;
+    tokenPrefix: string;
+  };
+  assert.ok(savedBody.token && savedBody.token !== initial.token);
+  assert.equal(savedBody.accessUrl, `http://192.168.1.9:30330/#token=${savedBody.token}`);
+
+  // 鉴权快照按「启动时快照；改动重启生效」语义仍认旧 token；磁盘 hash 已更新——
+  // GET 视图（读磁盘）回新前缀。旧 token 真正失效发生在 controller restartFromDisk
+  // 用新配置重建监听之后（controller 层职责，不在本层断言）。
+  const diskView = await httpGet(fixture.port, "/api/web-access/config", {
+    Authorization: `Bearer ${initial.token}`,
+  });
+  assert.equal(diskView.status, 200);
+  assert.equal(JSON.parse(diskView.body).tokenPrefix, savedBody.tokenPrefix);
+
+  // 回包完成后才触发重建回调（controller 在真实链路里据此停旧起新）。
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(configUpdatedCount, 1);
+
+  const unauthorizedPut = await httpPut(
+    fixture.port,
+    "/api/web-access/config",
+    JSON.stringify({ mode: "token" }),
+  );
+  assert.equal(unauthorizedPut.status, 401);
 });

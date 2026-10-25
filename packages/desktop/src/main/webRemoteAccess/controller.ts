@@ -12,10 +12,7 @@ import {
   resolveWebBindHost,
   updateWebAccessConfig,
 } from "@zcode/server";
-import {
-  startWebRemoteAccessServer,
-  type WebRemoteAccessServerHandle,
-} from "./server.js";
+import { startWebRemoteAccessServer, type WebRemoteAccessServerHandle } from "./server.js";
 import { LifecycleQueue } from "./lifecycleQueue.js";
 
 export interface WebRemoteAccessSaveResult {
@@ -74,6 +71,23 @@ export class WebRemoteAccessController {
   async reloadFromDisk(): Promise<WebRemoteAccessStatus> {
     return this.#lifecycle.run(async () => {
       this.#config = await loadWebAccessConfig();
+      await this.#syncServerLifecycle();
+      return this.getStatus();
+    });
+  }
+
+  /**
+   * HTTP PUT 保存后的重建入口（本机浏览器设置页保存，响应已回包才调用到这里）。
+   * 与 reloadFromDisk 的差别：监听器运行中时强制停旧起新——mode/bind/token 变更
+   * 必须重建监听才生效（reloadFromDisk 只在未运行时拉起，服务 app ready 恢复场景）。
+   */
+  async restartFromDisk(): Promise<WebRemoteAccessStatus> {
+    return this.#lifecycle.run(async () => {
+      this.#config = await loadWebAccessConfig();
+      if (this.#handle) {
+        await this.#handle.stop();
+        this.#handle = null;
+      }
       await this.#syncServerLifecycle();
       return this.getStatus();
     });
@@ -184,6 +198,16 @@ export class WebRemoteAccessController {
         port: Number(process.env.ZCODE_WEB_REMOTE_PORT) || 30330,
         webStaticDir: this.#getWebStaticDir(),
         getHostChild: this.#getHostChild,
+        // 本机浏览器设置页经 HTTP PUT 保存：落盘与回包已在 httpServer 完成，
+        // 这里停旧起新使 mode/bind/token 即时生效。经 LifecycleQueue 与 IPC 保存互斥。
+        onConfigUpdated: () => {
+          void this.restartFromDisk().catch((error: unknown) => {
+            this.#logger.error(
+              "[web-remote-access] restart after http save failed:",
+              error instanceof Error ? error.message : String(error),
+            );
+          });
+        },
         logger: this.#logger,
       });
     } catch (error) {
