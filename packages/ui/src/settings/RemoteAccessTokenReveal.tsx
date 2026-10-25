@@ -34,12 +34,7 @@ export function RemoteAccessTokenReveal({ token, accessUrl }: RemoteAccessTokenR
         description={formatMessage("settings.remoteAccess.oneTime.hint")}
         controlLayout="wide"
         control={
-          <Button
-            type="button"
-            size="lg"
-            variant="outline"
-            onClick={() => void copyText(token)}
-          >
+          <Button type="button" size="lg" variant="outline" onClick={() => void copyText(token)}>
             {formatMessage("settings.remoteAccess.copyToken")}
           </Button>
         }
@@ -64,9 +59,11 @@ export function RemoteAccessTokenReveal({ token, accessUrl }: RemoteAccessTokenR
             </Button>
           }
           detail={
-            <div className="flex w-full items-start gap-4">
+            // 上下布局（与 RemoteAccessQuickDialog 同构）：完整链接带 #token 很长，
+            // 左右并排会把地址挤塌成逐字符换行（min-w-0 + break-all 在窄容器下的表现）。
+            <div className="flex w-full flex-col items-center gap-3">
               <QrCode value={accessUrl} size={168} />
-              <div className="min-w-0 break-all font-mono text-ui-xs text-foreground-subtle">
+              <div className="w-full break-all rounded-md bg-surface px-3 py-2 text-center font-mono text-ui-xs text-foreground-subtle">
                 {accessUrl}
               </div>
             </div>
