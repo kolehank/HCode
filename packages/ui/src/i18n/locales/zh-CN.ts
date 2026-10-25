@@ -5247,8 +5247,10 @@ const zhCN: Record<string, string> = {
   "settings.remoteAccess.quick.description": "用手机扫码或打开链接，访问当前桌面会话",
   "settings.remoteAccess.quick.goSettings": "去设置",
   "settings.remoteAccess.quick.disabledHint": "远程访问尚未开启，请先在设置中开启。",
-  "settings.remoteAccess.quick.tokenHint": "当前为 Token 鉴权模式。生成新访问链接后旧链接立即失效。",
-  "settings.remoteAccess.quick.noBaseUrlHint": "尚未配置外部访问基址，请先在设置中选择网卡或填写基址。",
+  "settings.remoteAccess.quick.tokenHint":
+    "当前为 Token 鉴权模式。生成新访问链接后旧链接立即失效。",
+  "settings.remoteAccess.quick.noBaseUrlHint":
+    "尚未配置外部访问基址，请先在设置中选择网卡或填写基址。",
   "automations.pageTab.automation": "自动化",
   "automations.pageTab.workflow": "工作流",
   "workflows.hub.description": "保存在已打开项目里的工作流，填好参数就能再跑一次。",
@@ -6939,7 +6941,7 @@ const zhCN: Record<string, string> = {
   "settings.remoteAccess.port": "服务端口",
   "settings.remoteAccess.baseUrl.label": "基址（可见可编辑）",
   "settings.remoteAccess.baseUrl.description":
-    "网卡下拉生成 `http://<ip>:<端口>` 建议；也可手填域名/反代地址（如 https://xxx.ts.net）。链接内容 = 基址 + /#token=<令牌>。",
+    "网卡下拉生成 `http://<ip>:<端口>` 建议；也可手填域名/反代地址（如 https://xxx.ts.net）。链接内容 = 基址 + /#token=<令牌>；基址留空时，扫码/复制链接回退本机回环地址。",
   "settings.remoteAccess.save.title": "保存配置",
   "settings.remoteAccess.save.action": "保存",
   "settings.remoteAccess.savedToast": "已保存，重启 server 后生效",

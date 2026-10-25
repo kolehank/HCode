@@ -47,6 +47,12 @@ desktop: server.ts（electron 适配层：MessagePort 桥 bridgeWebSocketToHost�
 - `cfAllowedEmails` 空数组 = 不限制 email；非空 = JWT 的 email claim 必须（大小写不敏感、trim 后）命中任一候选。
 - **空串候选不参与匹配**：解析层（desktop IPC `parseSaveRequest` 与 server PUT 路由一致）过滤空串；校验层跳过空候选。双保险的原因：allowlist 混入 `""` 会把「无 email claim 的合法 JWT」（email 视为 `""`）放行。
 
+### 外部访问基址（externalBaseUrl）语义
+
+- **可空**。已配置时参与 WS Origin 校验（`Origin` 可与其 origin 相等）并作为访问链接前缀；为空时 Origin 校验语义不变（只允许与请求 Host 同源）。
+- **访问链接回退**：token 生成时刻基址为空 → 链接回退 `http://127.0.0.1:<port>/#token=<token>`（`buildAccessUrl` 单一来源，server 形态与 desktop 形态一致）。回退值**仅用于展示**（二维码/复制链接），不落盘、不参与 Origin 校验——外部访问语义始终以磁盘配置为准。
+- **设置页网卡联动**：加载时基址为空则回显当前建议网卡的 `http://<ip>:<端口>`（可见可编辑，不静默写盘）；切换网卡时仅当基址为空或仍是上一条自动建议才跟随新选择，**用户手填的域名/反代地址优先，不被覆盖**。
+
 ## 生命周期与并发
 
 - 事件顺序（保存配置）：`updateWebAccessConfig 落盘 → stop 旧监听（强断全部 WS 桥）→ 按新配置 start`。mode/bind 变更必须先停后起，不允许新旧快照并存。

@@ -6,6 +6,7 @@ import type { UtilityProcess as ElectronUtilityProcess } from "electron";
 import type { WebRemoteAccessSaveRequest, WebRemoteAccessStatus } from "@zcode/shared";
 import type { WebAccessConfig, WebBindResolution } from "@zcode/server";
 import {
+  buildAccessUrl,
   generateWebAccessToken,
   getDefaultWebAccessConfig,
   loadWebAccessConfig,
@@ -14,6 +15,9 @@ import {
 } from "@zcode/server";
 import { startWebRemoteAccessServer, type WebRemoteAccessServerHandle } from "./server.js";
 import { LifecycleQueue } from "./lifecycleQueue.js";
+
+/** 内嵌入口默认端口；ZCODE_WEB_REMOTE_PORT 可覆盖（与 #syncServerLifecycle 同一来源语义）。 */
+const DEFAULT_WEB_REMOTE_PORT = 30330;
 
 export interface WebRemoteAccessSaveResult {
   status: WebRemoteAccessStatus;
@@ -141,9 +145,13 @@ export class WebRemoteAccessController {
             next.tokenHash = generated.tokenHash;
             next.tokenPrefix = generated.tokenPrefix;
             oneTimeToken = generated.token;
-            if (next.externalBaseUrl) {
-              accessUrl = `${next.externalBaseUrl.replace(/\/+$/, "")}/#token=${generated.token}`;
-            }
+            // 链接拼接单一来源 buildAccessUrl：基址为空时回退本机回环（仅展示，不落盘），
+            // 与 server 形态同一语义。端口取当前监听值（未运行时回退配置默认端口）。
+            accessUrl = buildAccessUrl(
+              next.externalBaseUrl,
+              generated.token,
+              this.#handle?.port ?? DEFAULT_WEB_REMOTE_PORT,
+            );
           }
         }
         return next;
@@ -195,7 +203,7 @@ export class WebRemoteAccessController {
         config: this.#config,
         // WebBindResolution.host 类型可选，但 resolveWebBindHost 的三条分支都返回非空值。
         bindHost: bind.host ?? "127.0.0.1",
-        port: Number(process.env.ZCODE_WEB_REMOTE_PORT) || 30330,
+        port: Number(process.env.ZCODE_WEB_REMOTE_PORT) || DEFAULT_WEB_REMOTE_PORT,
         webStaticDir: this.#getWebStaticDir(),
         getHostChild: this.#getHostChild,
         // 本机浏览器设置页经 HTTP PUT 保存：落盘与回包已在 httpServer 完成，

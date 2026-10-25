@@ -45,12 +45,38 @@ function formatInterfaceLabel(
   return `${item.name} — ${item.address}${suffix}`;
 }
 
+/**
+ * 网卡联动规则（spec「外部访问基址」节）：切换网卡时，仅当基址为空或仍是上一条
+ * 自动建议才跟随新选择；用户手填的域名/反代地址优先，不被覆盖。
+ * 返回 undefined 表示保持当前输入不变（含目标网卡不存在/端口未就绪的情况）。
+ */
+export function nextExternalBaseUrlOnSelection(options: {
+  currentBaseUrl: string;
+  previousSelectedAddress: string;
+  nextAddress: string;
+  interfaces: WebAccessInterfaceItem[];
+  port: number;
+}): string | undefined {
+  const nextItem = options.interfaces.find(
+    (candidate) => candidate.address === options.nextAddress,
+  );
+  if (!nextItem || options.port <= 0) {
+    return undefined;
+  }
+  const previousItem = options.interfaces.find(
+    (candidate) => candidate.address === options.previousSelectedAddress,
+  );
+  const previousSuggestion = previousItem ? buildInterfaceUrl(previousItem, options.port) : "";
+  const current = options.currentBaseUrl.trim();
+  if (!current || current === previousSuggestion) {
+    return buildInterfaceUrl(nextItem, options.port);
+  }
+  return undefined;
+}
+
 export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
   const { intl } = useZCodeIntl();
-  const formatMessage = useCallback(
-    (id: string) => intl.formatMessage({ id }),
-    [intl],
-  );
+  const formatMessage = useCallback((id: string) => intl.formatMessage({ id }), [intl]);
   const platform = usePlatform();
   const desktopBridge = isDesktop ? platform.webRemoteAccess : undefined;
 
@@ -114,6 +140,11 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
         const suggested =
           result.interfaces.find((item) => item.suggested) ?? result.interfaces[0] ?? null;
         setSelectedAddress(suggested?.address ?? "");
+        // 基址未配置时回显建议网卡地址（可见可编辑，保存时才落盘），与网卡下拉联动；
+        // 用户已保存的域名/反代地址保持原样。
+        if (!config.externalBaseUrl && suggested && config.port > 0) {
+          setExternalBaseUrl(buildInterfaceUrl(suggested, config.port));
+        }
         setLoaded(true);
       } catch (error) {
         if (!cancelled) {
@@ -337,24 +368,30 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
           <SettingsRow
             label={formatMessage("settings.remoteAccess.interface.label")}
             description={
-              port > 0
-                ? `${formatMessage("settings.remoteAccess.port")}: ${port}`
-                : undefined
+              port > 0 ? `${formatMessage("settings.remoteAccess.port")}: ${port}` : undefined
             }
             control={
               <Select
                 value={selectedAddress}
                 onValueChange={(address) => {
-                  const item = interfaces.find((candidate) => candidate.address === address);
+                  const next = nextExternalBaseUrlOnSelection({
+                    currentBaseUrl: externalBaseUrl,
+                    previousSelectedAddress: selectedAddress,
+                    nextAddress: address,
+                    interfaces,
+                    port,
+                  });
                   setSelectedAddress(address);
-                  if (item && port > 0) {
+                  if (next !== undefined) {
                     // 建议值回显到下方输入框，保持「可见可编辑」，不静默生效。
-                    setExternalBaseUrl(buildInterfaceUrl(item, port));
+                    setExternalBaseUrl(next);
                   }
                 }}
               >
                 <SelectTrigger size="lg" className="w-64 min-w-0 justify-between">
-                  <SelectValue placeholder={formatMessage("settings.remoteAccess.interface.pick")} />
+                  <SelectValue
+                    placeholder={formatMessage("settings.remoteAccess.interface.pick")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {interfaces.length === 0 ? (

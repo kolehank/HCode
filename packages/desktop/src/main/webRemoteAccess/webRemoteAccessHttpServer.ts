@@ -344,7 +344,8 @@ export function startWebRemoteAccessHttpServer(
           ...(generated
             ? {
                 token: generated.token,
-                accessUrl: buildAccessUrl(next.externalBaseUrl, generated.token),
+                // 基址为空时回退本机回环（仅展示，不落盘），与 server 形态同一语义。
+                accessUrl: buildAccessUrl(next.externalBaseUrl, generated.token, listeningPort),
               }
             : {}),
         }),

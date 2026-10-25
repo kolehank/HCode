@@ -5520,11 +5520,15 @@ const enUS: Record<string, string> = {
   "automations.pageTab.ariaLabel": "Automations page",
   "offPeak.keepAwakeBanner": "Keep the device awake while tasks are running",
   "settings.remoteAccess.quick.title": "Mobile remote access",
-  "settings.remoteAccess.quick.description": "Scan the QR code or open the link on your phone to access this desktop session",
+  "settings.remoteAccess.quick.description":
+    "Scan the QR code or open the link on your phone to access this desktop session",
   "settings.remoteAccess.quick.goSettings": "Open settings",
-  "settings.remoteAccess.quick.disabledHint": "Remote access is not enabled yet. Enable it in settings first.",
-  "settings.remoteAccess.quick.tokenHint": "Token auth mode. Generating a new link invalidates the old one immediately.",
-  "settings.remoteAccess.quick.noBaseUrlHint": "No external base URL configured yet. Pick a network interface or set a base URL in settings.",
+  "settings.remoteAccess.quick.disabledHint":
+    "Remote access is not enabled yet. Enable it in settings first.",
+  "settings.remoteAccess.quick.tokenHint":
+    "Token auth mode. Generating a new link invalidates the old one immediately.",
+  "settings.remoteAccess.quick.noBaseUrlHint":
+    "No external base URL configured yet. Pick a network interface or set a base URL in settings.",
   "automations.pageTab.automation": "Automations",
   "automations.pageTab.workflow": "Workflows",
   "workflows.hub.description":
@@ -7257,7 +7261,7 @@ const enUS: Record<string, string> = {
   "settings.remoteAccess.port": "Server port",
   "settings.remoteAccess.baseUrl.label": "Base URL (visible and editable)",
   "settings.remoteAccess.baseUrl.description":
-    "The interface dropdown suggests `http://<ip>:<port>`; you can also type a domain/proxy URL (e.g. https://xxx.ts.net). QR/link content = base URL + /#token=<token>.",
+    "The interface dropdown suggests `http://<ip>:<port>`; you can also type a domain/proxy URL (e.g. https://xxx.ts.net). QR/link content = base URL + /#token=<token>; when the base URL is empty, the QR/link falls back to the local loopback address.",
   "settings.remoteAccess.save.title": "Save config",
   "settings.remoteAccess.save.action": "Save",
   "settings.remoteAccess.savedToast": "Saved. Restart the server to take effect",
