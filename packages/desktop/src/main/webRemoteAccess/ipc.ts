@@ -5,6 +5,7 @@
 import { ipcMain } from "electron";
 import { PlatformChannels } from "@zcode/shared";
 import type {
+  WebAccessInterfaceOption,
   WebRemoteAccessConfigSnapshot,
   WebRemoteAccessSaveResponse,
 } from "@zcode/shared";
@@ -72,9 +73,11 @@ export function registerWebRemoteAccessIpc(options: {
     PlatformChannels.WebAccessGetInterfaces,
     wrapHandler(
       PlatformChannels.WebAccessGetInterfaces,
-      async () => ({
-        interfaces: listWebAccessInterfaces(),
-      }),
+      // 契约（IPlatformService.webRemoteAccess.getInterfaces 与 preload 签名）是
+      // WebAccessInterfaceOption[] 数组。曾返回 { interfaces: [...] } 包层对象，
+      // preload 的 as 断言不校验运行时形状——QuickDialog 首个消费者直接
+      // interfaces.find 崩区域（回归：IPC 返回形状必须与平台契约逐字一致）。
+      async (): Promise<WebAccessInterfaceOption[]> => listWebAccessInterfaces(),
       logger.error,
     ),
   );
