@@ -185,6 +185,11 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
         }
         setTokenPrefix(result.tokenPrefix);
         setHasToken(result.hasToken);
+        // 保存后同步实际监听端口：加载时 server 未运行 port 为 0，「服务端口」
+        // 不显示、网卡联动失效；desktop 保存即时重建监听，port 回来后要刷新。
+        if (result.port !== undefined) {
+          setPort(result.port);
+        }
         if (result.token) {
           // 明文只在生成响应里出现一次；组件卸载后 UI 不再持有。
           setOneTimeToken({

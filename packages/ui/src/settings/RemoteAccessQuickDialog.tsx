@@ -21,11 +21,17 @@ import { logger } from "@/logger.js";
 import { QrCode } from "@/settings/QrCode.js";
 import { toast } from "@/components/ui/toast.js";
 import { setPendingSettingsSectionIntent } from "@/lib/settingsNavigation.js";
-import type { WebRemoteAccessStatus } from "@zcode/shared";
+import {
+  resolveWebAccessDisplayBaseUrl,
+  type WebAccessInterfaceOption,
+  type WebRemoteAccessStatus,
+} from "@zcode/shared";
 
 interface QuickAccessState {
   phase: "loading" | "ready" | "error";
   status: WebRemoteAccessStatus | null;
+  /** 网卡候选（与 getConfig 并行拉取；展示回退链取建议网卡）。 */
+  interfaces: WebAccessInterfaceOption[];
   /** token 模式重新生成后的一次性明文链接。 */
   regeneratedUrl: string | null;
   errorDetail: string | null;
@@ -34,6 +40,7 @@ interface QuickAccessState {
 const INITIAL_STATE: QuickAccessState = {
   phase: "loading",
   status: null,
+  interfaces: [],
   regeneratedUrl: null,
   errorDetail: null,
 };
@@ -71,11 +78,15 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
     }
     void (async () => {
       try {
-        const snapshot = await bridge.getConfig();
+        const [snapshot, interfaces] = await Promise.all([
+          bridge.getConfig(),
+          bridge.getInterfaces(),
+        ]);
         if (cancelled) return;
         setState({
           phase: "ready",
           status: snapshot.status,
+          interfaces,
           regeneratedUrl: null,
           errorDetail: null,
         });
@@ -138,9 +149,24 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
   }, [onOpenChange, tabStoreApi]);
 
   const status = state.status;
+  // 展示回退链（shared 单一来源）：已配置基址 > 建议网卡（仅 token/CF 档）> 回环。
+  // port 未就绪（server 未运行）时为空串，按无链接处理。
+  const suggested = state.interfaces.find((item) => item.suggested) ?? state.interfaces[0] ?? null;
+  const displayBaseUrl =
+    status && status.running
+      ? resolveWebAccessDisplayBaseUrl({
+          externalBaseUrl: status.externalBaseUrl,
+          mode: status.mode,
+          port: status.port ?? 0,
+          suggestedAddress: suggested?.address,
+        })
+      : "";
+  // open/CF 档二维码内容就是地址本身（无 token）；token 档必须带 #token=，
+  // 只有 regenerate 拿到的一次性明文链接可作二维码内容（无则走 regenerate 引导）。
   const accessUrl =
-    state.regeneratedUrl ??
-    (status?.externalBaseUrl ? status.externalBaseUrl.replace(/\/+$/, "") : "");
+    state.regeneratedUrl ?? (displayBaseUrl && status?.mode !== "token" ? displayBaseUrl : "");
+  const isFallbackUrl =
+    !state.regeneratedUrl && !status?.externalBaseUrl.trim() && Boolean(accessUrl);
   const tokenReady = status?.enabled && status.mode === "token" && state.regeneratedUrl;
 
   const renderBody = () => {
@@ -183,11 +209,7 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
           <p className="text-ui-base/relaxed text-foreground-subtle">
             {formatMessage("settings.remoteAccess.quick.tokenHint")}
           </p>
-          <Button
-            type="button"
-            disabled={regenerating}
-            onClick={() => void regenerateTokenUrl()}
-          >
+          <Button type="button" disabled={regenerating} onClick={() => void regenerateTokenUrl()}>
             {regenerating ? (
               <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
             ) : (
@@ -220,6 +242,11 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
         <div className="w-full break-all rounded-md bg-surface px-3 py-2 text-center font-mono text-ui-xs text-foreground-subtle">
           {accessUrl}
         </div>
+        {isFallbackUrl ? (
+          <p className="text-ui-xs text-foreground-subtle">
+            {formatMessage("settings.remoteAccess.quick.fallbackUrlHint")}
+          </p>
+        ) : null}
         <Button
           type="button"
           variant="outline"
@@ -275,9 +302,7 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
                 <MonitorSmartphone className="size-5" />
               </div>
               <div className="space-y-1">
-                <DialogTitle>
-                  {formatMessage("settings.remoteAccess.quick.title")}
-                </DialogTitle>
+                <DialogTitle>{formatMessage("settings.remoteAccess.quick.title")}</DialogTitle>
                 <DialogDescription>
                   {formatMessage("settings.remoteAccess.quick.description")}
                 </DialogDescription>

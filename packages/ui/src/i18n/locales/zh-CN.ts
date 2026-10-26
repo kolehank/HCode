@@ -5251,6 +5251,10 @@ const zhCN: Record<string, string> = {
     "当前为 Token 鉴权模式。生成新访问链接后旧链接立即失效。",
   "settings.remoteAccess.quick.noBaseUrlHint":
     "尚未配置外部访问基址，请先在设置中选择网卡或填写基址。",
+  "settings.remoteAccess.quick.runningHint": "远程访问入口运行中。",
+  "settings.remoteAccess.quick.stoppedHint": "远程访问入口未运行。",
+  "settings.remoteAccess.quick.fallbackUrlHint":
+    "未配置外部基址，当前为按鉴权模式自动生成的建议地址（仅展示、不落盘）；在设置中配置基址可固定。",
   "automations.pageTab.automation": "自动化",
   "automations.pageTab.workflow": "工作流",
   "workflows.hub.description": "保存在已打开项目里的工作流，填好参数就能再跑一次。",
@@ -6941,7 +6945,7 @@ const zhCN: Record<string, string> = {
   "settings.remoteAccess.port": "服务端口",
   "settings.remoteAccess.baseUrl.label": "基址（可见可编辑）",
   "settings.remoteAccess.baseUrl.description":
-    "网卡下拉生成 `http://<ip>:<端口>` 建议；也可手填域名/反代地址（如 https://xxx.ts.net）。链接内容 = 基址 + /#token=<令牌>；基址留空时，扫码/复制链接回退本机回环地址。",
+    "网卡下拉生成 `http://<ip>:<端口>` 建议；也可手填域名/反代地址（如 https://xxx.ts.net）。链接内容 = 基址 + /#token=<令牌>；基址留空时，链接按鉴权模式回退：开放档回本机回环，token/CF 档优先建议网卡地址（仅展示、不落盘）。",
   "settings.remoteAccess.save.title": "保存配置",
   "settings.remoteAccess.save.action": "保存",
   "settings.remoteAccess.savedToast": "已保存，重启 server 后生效",

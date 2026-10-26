@@ -7,7 +7,7 @@ import { stat } from "node:fs/promises";
 import { extname, join, relative, sep } from "node:path";
 import type { Socket } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
-import { formatZodError } from "@zcode/shared";
+import { formatZodError, resolveWebAccessDisplayBaseUrl } from "@zcode/shared";
 import type { WebAccessConfig } from "@zcode/server";
 import {
   authorizeRequest,
@@ -344,8 +344,19 @@ export function startWebRemoteAccessHttpServer(
           ...(generated
             ? {
                 token: generated.token,
-                // 基址为空时回退本机回环（仅展示，不落盘），与 server 形态同一语义。
-                accessUrl: buildAccessUrl(next.externalBaseUrl, generated.token, listeningPort),
+                // 展示回退链（基址 > 建议网卡 > 回环，仅展示不落盘），与 server
+                // 形态及 UI 弹窗同一语义。
+                accessUrl: buildAccessUrl(
+                  resolveWebAccessDisplayBaseUrl({
+                    externalBaseUrl: next.externalBaseUrl,
+                    mode: next.mode,
+                    port: listeningPort,
+                    suggestedAddress: listWebAccessInterfaces().find(
+                      (candidate) => candidate.suggested,
+                    )?.address,
+                  }),
+                  generated.token,
+                ),
               }
             : {}),
         }),

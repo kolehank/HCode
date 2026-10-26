@@ -2,7 +2,7 @@
 import { networkInterfaces } from "node:os";
 import { Hono } from "hono";
 import { createServiceLogger } from "@zcode/services/node";
-import { formatZodError } from "@zcode/shared";
+import { formatZodError, resolveWebAccessDisplayBaseUrl } from "@zcode/shared";
 import {
   buildAccessUrl,
   generateWebAccessToken,
@@ -191,8 +191,19 @@ export function registerWebAccessRoutes(app: Hono, options: WebAccessRouteOption
         ...(generated
           ? {
               token: generated.token,
-              // 基址为空时回退本机回环（仅展示，不落盘），与 desktop 形态同一语义。
-              accessUrl: buildAccessUrl(next.externalBaseUrl, generated.token, options.port),
+              // 展示回退链（基址 > 建议网卡 > 回环，仅展示不落盘），与 desktop
+              // 形态及 UI 弹窗同一语义。
+              accessUrl: buildAccessUrl(
+                resolveWebAccessDisplayBaseUrl({
+                  externalBaseUrl: next.externalBaseUrl,
+                  mode: next.mode,
+                  port: options.port,
+                  suggestedAddress: listWebAccessInterfaces().find(
+                    (candidate) => candidate.suggested,
+                  )?.address,
+                }),
+                generated.token,
+              ),
             }
           : {}),
       });

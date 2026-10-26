@@ -75,26 +75,13 @@ export function validateWebAccessUpdateCrossFields(body: WebAccessUpdateInput): 
   return null;
 }
 
-/**
- * 拼访问链接：基址 + 一次性明文 token。基址未配置时回退 `http://127.0.0.1:<port>`
- * （仅用于展示链接：二维码/复制；不落盘、不参与 Origin 校验，见 spec「外部访问基址」节）。
- * 无回退端口且基址为空时返回 undefined（调用方按无链接处理）。
- */
-export function buildAccessUrl(
-  externalBaseUrl: string,
-  token: string,
-  fallbackLoopbackPort?: number,
-): string | undefined {
+/** 拼访问链接：展示基址（先经 resolveWebAccessDisplayBaseUrl 按回退链解析）+ 一次性明文 token。空基址返回 undefined。 */
+export function buildAccessUrl(externalBaseUrl: string, token: string): string | undefined {
   const trimmed = externalBaseUrl.trim().replace(/\/+$/, "");
-  const base =
-    trimmed ||
-    (fallbackLoopbackPort && fallbackLoopbackPort > 0
-      ? `http://127.0.0.1:${fallbackLoopbackPort}`
-      : "");
-  if (!base) {
+  if (!trimmed) {
     return undefined;
   }
-  return `${base}/#token=${token}`;
+  return `${trimmed}/#token=${token}`;
 }
 
 export function getDefaultWebAccessConfig(): WebAccessConfig {

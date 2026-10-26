@@ -5529,6 +5529,10 @@ const enUS: Record<string, string> = {
     "Token auth mode. Generating a new link invalidates the old one immediately.",
   "settings.remoteAccess.quick.noBaseUrlHint":
     "No external base URL configured yet. Pick a network interface or set a base URL in settings.",
+  "settings.remoteAccess.quick.runningHint": "Remote access entry is running.",
+  "settings.remoteAccess.quick.stoppedHint": "Remote access entry is not running.",
+  "settings.remoteAccess.quick.fallbackUrlHint":
+    "No external base URL configured. This auto-generated address follows the auth mode (display only, not persisted); set a base URL in settings to pin it.",
   "automations.pageTab.automation": "Automations",
   "automations.pageTab.workflow": "Workflows",
   "workflows.hub.description":
@@ -7261,7 +7265,7 @@ const enUS: Record<string, string> = {
   "settings.remoteAccess.port": "Server port",
   "settings.remoteAccess.baseUrl.label": "Base URL (visible and editable)",
   "settings.remoteAccess.baseUrl.description":
-    "The interface dropdown suggests `http://<ip>:<port>`; you can also type a domain/proxy URL (e.g. https://xxx.ts.net). QR/link content = base URL + /#token=<token>; when the base URL is empty, the QR/link falls back to the local loopback address.",
+    "The interface dropdown suggests `http://<ip>:<port>`; you can also type a domain/proxy URL (e.g. https://xxx.ts.net). QR/link content = base URL + /#token=<token>; when the base URL is empty, the link falls back per auth mode: open mode to the local loopback, token/CF modes to the suggested interface address (display only, not persisted).",
   "settings.remoteAccess.save.title": "Save config",
   "settings.remoteAccess.save.action": "Save",
   "settings.remoteAccess.savedToast": "Saved. Restart the server to take effect",

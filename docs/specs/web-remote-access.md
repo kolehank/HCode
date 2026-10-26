@@ -50,8 +50,10 @@ desktop: server.ts（electron 适配层：MessagePort 桥 bridgeWebSocketToHost�
 ### 外部访问基址（externalBaseUrl）语义
 
 - **可空**。已配置时参与 WS Origin 校验（`Origin` 可与其 origin 相等）并作为访问链接前缀；为空时 Origin 校验语义不变（只允许与请求 Host 同源）。
-- **访问链接回退**：token 生成时刻基址为空 → 链接回退 `http://127.0.0.1:<port>/#token=<token>`（`buildAccessUrl` 单一来源，server 形态与 desktop 形态一致）。回退值**仅用于展示**（二维码/复制链接），不落盘、不参与 Origin 校验——外部访问语义始终以磁盘配置为准。
-- **设置页网卡联动**：加载时基址为空则回显当前建议网卡的 `http://<ip>:<端口>`（可见可编辑，不静默写盘）；切换网卡时仅当基址为空或仍是上一条自动建议才跟随新选择，**用户手填的域名/反代地址优先，不被覆盖**。
+- **展示回退链（mode-aware，唯一来源 `@zcode/shared` 的 `resolveWebAccessDisplayBaseUrl`）**：已配置基址 > 建议网卡地址（仅 token/CF 档）> 本机回环。**open 档监听被强制绑回环，LAN 地址必不可达，回退固定回环**；token/CF 档允许非回环 bind，二维码的意义是给其他设备扫，故优先建议网卡。回退值**仅用于展示**（二维码/复制链接），不落盘、不参与 Origin 校验——外部访问语义始终以磁盘配置为准。port 未就绪（server 未运行）时无回退值，UI 按无链接处理。
+- **访问链接拼接**：`buildAccessUrl(基址或回退值, token)` 单一来源，三处调用点（desktop IPC 保存、desktop 内嵌 HTTP PUT、server 形态 PUT）与 UI 弹窗共用同一回退链。
+- **设置页网卡联动**：加载时基址为空则回显当前建议网卡的 `http://<ip>:<端口>`（可见可编辑，不静默写盘）；切换网卡时仅当基址为空或仍是上一条自动建议才跟随新选择，**用户手填的域名/反代地址优先，不被覆盖**。保存成功后从保存响应同步端口/令牌状态回 UI（port 未运行时为 0，保存启动 server 后须刷新，否则「服务端口」不显示、联动失效）。
+- **手机快捷弹窗（QuickDialog）**：数据面走 desktop IPC（getConfig + getInterfaces）。open 档基址为空时直接展示回退地址二维码；token 档无一次性明文时维持 regenerate 引导。展示回退地址时须标注「自动建议、不落盘」。
 
 ## 生命周期与并发
 

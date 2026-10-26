@@ -12,20 +12,9 @@ describe("buildAccessUrl", () => {
     );
   });
 
-  it("基址为空且无回退端口：返回 undefined（调用方按无链接处理）", () => {
+  it("基址为空：返回 undefined（展示基址应先经 resolveWebAccessDisplayBaseUrl 解析）", () => {
     expect(buildAccessUrl("", "tok")).toBeUndefined();
     expect(buildAccessUrl("   ", "tok")).toBeUndefined();
-  });
-
-  it("基址为空且提供回退端口：回退本机回环（仅展示语义）", () => {
-    expect(buildAccessUrl("", "tok", 30330)).toBe("http://127.0.0.1:30330/#token=tok");
-    expect(buildAccessUrl("", "tok", 0)).toBeUndefined();
-  });
-
-  it("基址已配置时忽略回退端口，以用户配置为准", () => {
-    expect(buildAccessUrl("https://zcode.example.com", "tok", 30330)).toBe(
-      "https://zcode.example.com/#token=tok",
-    );
   });
 });
 

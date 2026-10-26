@@ -57,6 +57,8 @@ export interface RemoteAccessSaveResult {
   hasToken: boolean;
   token?: string;
   accessUrl?: string;
+  /** 保存后内嵌入口的实际监听端口（desktop 保存即时重建监听后非 0；web 形态沿用 load 值）。 */
+  port?: number;
 }
 
 export interface RemoteAccessAdapter {
@@ -99,6 +101,7 @@ export function createWebRemoteAccessAdapter(): RemoteAccessAdapter {
         hasToken: result.hasToken,
         ...(result.token ? { token: result.token } : {}),
         ...(result.accessUrl ? { accessUrl: result.accessUrl } : {}),
+        ...(result.port ? { port: result.port } : {}),
       };
     },
   };
@@ -142,6 +145,8 @@ export function createDesktopRemoteAccessAdapter(
       return {
         tokenPrefix: result.status.tokenPrefix,
         hasToken: result.status.hasToken,
+        // 保存即时重建监听后的实际端口回传 UI（未运行时 status.port 为 undefined）。
+        ...(result.status.port ? { port: result.status.port } : {}),
         ...(result.token ? { token: result.token } : {}),
         ...(result.accessUrl ? { accessUrl: result.accessUrl } : {}),
       };

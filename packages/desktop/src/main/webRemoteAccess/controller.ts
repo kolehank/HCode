@@ -4,11 +4,13 @@
 // 这里只做 desktopEnabled 驱动的启停编排，不复制第二份持久化逻辑。
 import type { UtilityProcess as ElectronUtilityProcess } from "electron";
 import type { WebRemoteAccessSaveRequest, WebRemoteAccessStatus } from "@zcode/shared";
+import { resolveWebAccessDisplayBaseUrl } from "@zcode/shared";
 import type { WebAccessConfig, WebBindResolution } from "@zcode/server";
 import {
   buildAccessUrl,
   generateWebAccessToken,
   getDefaultWebAccessConfig,
+  listWebAccessInterfaces,
   loadWebAccessConfig,
   resolveWebBindHost,
   updateWebAccessConfig,
@@ -145,12 +147,17 @@ export class WebRemoteAccessController {
             next.tokenHash = generated.tokenHash;
             next.tokenPrefix = generated.tokenPrefix;
             oneTimeToken = generated.token;
-            // 链接拼接单一来源 buildAccessUrl：基址为空时回退本机回环（仅展示，不落盘），
-            // 与 server 形态同一语义。端口取当前监听值（未运行时回退配置默认端口）。
+            // 展示回退链单一来源 resolveWebAccessDisplayBaseUrl（基址 > 建议网卡 > 回环，
+            // 仅展示不落盘），与 server 形态及 UI 弹窗同一语义。
             accessUrl = buildAccessUrl(
-              next.externalBaseUrl,
+              resolveWebAccessDisplayBaseUrl({
+                externalBaseUrl: next.externalBaseUrl,
+                mode: next.mode,
+                port: this.#handle?.port ?? DEFAULT_WEB_REMOTE_PORT,
+                suggestedAddress: listWebAccessInterfaces().find((candidate) => candidate.suggested)
+                  ?.address,
+              }),
               generated.token,
-              this.#handle?.port ?? DEFAULT_WEB_REMOTE_PORT,
             );
           }
         }

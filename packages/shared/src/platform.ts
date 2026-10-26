@@ -1275,3 +1275,34 @@ export interface WebRemoteAccessSaveResponse {
   token?: string;
   accessUrl?: string;
 }
+
+/**
+ * 外部访问基址的展示回退链（spec「外部访问基址」节；唯一来源，UI 弹窗与三处
+ * accessUrl 拼接点共用）：
+ *   已配置基址 > 建议网卡地址（仅 token/CF 档）> 本机回环。
+ * open 档监听被强制绑回环，LAN 地址必不可达，回退固定回环；token/CF 档允许
+ * 非回环 bind，二维码的意义是给其他设备扫，故优先建议网卡。
+ * 回退值仅用于展示（二维码/复制链接），不落盘、不参与 Origin 校验——外部访问
+ * 语义始终以磁盘配置为准。port 未就绪（server 未运行）时返回空串，调用方按无链接处理。
+ */
+export function resolveWebAccessDisplayBaseUrl(options: {
+  externalBaseUrl: string;
+  mode: WebAccessModeOption;
+  port: number;
+  suggestedAddress?: string;
+}): string {
+  const trimmed = options.externalBaseUrl.trim().replace(/\/+$/, "");
+  if (trimmed) {
+    return trimmed;
+  }
+  if (options.port <= 0) {
+    return "";
+  }
+  if (options.mode !== "open" && options.suggestedAddress) {
+    const host = options.suggestedAddress.includes(":")
+      ? `[${options.suggestedAddress}]`
+      : options.suggestedAddress;
+    return `http://${host}:${options.port}`;
+  }
+  return `http://127.0.0.1:${options.port}`;
+}
