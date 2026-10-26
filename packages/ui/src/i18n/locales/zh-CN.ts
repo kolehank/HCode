@@ -6953,8 +6953,7 @@ const zhCN: Record<string, string> = {
   "settings.remoteAccess.restartHint": "改动需重启 server 后生效",
   "settings.remoteAccess.oneTime.section": "访问令牌（仅显示一次）",
   "settings.remoteAccess.oneTime.token": "令牌明文",
-  "settings.remoteAccess.oneTime.hint":
-    "令牌明文仅本次展示，请立即复制保存；文件中只保留 SHA-256 摘要与前缀。",
+  "settings.remoteAccess.oneTime.hint": "仅本次展示，请立即复制保存。",
   "settings.remoteAccess.oneTime.qr": "扫码打开",
   "settings.remoteAccess.copyToken": "复制令牌",
   "settings.remoteAccess.copyLink": "复制完整链接",

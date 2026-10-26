@@ -7273,8 +7273,7 @@ const enUS: Record<string, string> = {
   "settings.remoteAccess.restartHint": "Changes take effect after restarting the server",
   "settings.remoteAccess.oneTime.section": "Access token (shown once)",
   "settings.remoteAccess.oneTime.token": "Token plaintext",
-  "settings.remoteAccess.oneTime.hint":
-    "The token is shown only once. Copy it now; the file keeps only the SHA-256 digest and prefix.",
+  "settings.remoteAccess.oneTime.hint": "Shown only once. Copy it now.",
   "settings.remoteAccess.oneTime.qr": "Scan to open",
   "settings.remoteAccess.copyToken": "Copy token",
   "settings.remoteAccess.copyLink": "Copy full link",

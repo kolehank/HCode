@@ -45,30 +45,26 @@ export function RemoteAccessTokenReveal({ token, accessUrl }: RemoteAccessTokenR
         }
       />
       {accessUrl ? (
-        <SettingsRow
-          label={formatMessage("settings.remoteAccess.oneTime.qr")}
-          controlLayout="wide"
-          control={
-            <Button
-              type="button"
-              size="lg"
-              variant="outline"
-              onClick={() => void copyText(accessUrl)}
-            >
-              {formatMessage("settings.remoteAccess.copyLink")}
-            </Button>
-          }
-          detail={
-            // 上下布局（与 RemoteAccessQuickDialog 同构）：完整链接带 #token 很长，
-            // 左右并排会把地址挤塌成逐字符换行（min-w-0 + break-all 在窄容器下的表现）。
-            <div className="flex w-full flex-col items-center gap-3">
-              <QrCode value={accessUrl} size={168} />
-              <div className="w-full break-all rounded-md bg-surface px-3 py-2 text-center font-mono text-ui-xs text-foreground-subtle">
-                {accessUrl}
-              </div>
-            </div>
-          }
-        />
+        // 整行上下布局（与 RemoteAccessQuickDialog 卡片同构）：wide 行的 label|280px
+        // 列会把高 QR 塞进右列、左侧留大片空白。
+        <div className="flex flex-col items-center gap-3 border-t border-border px-4 py-4">
+          <div className="text-ui-base font-medium text-foreground">
+            {formatMessage("settings.remoteAccess.oneTime.qr")}
+          </div>
+          <QrCode value={accessUrl} size={192} />
+          <div className="w-full break-all rounded-md bg-surface px-3 py-2 text-center font-mono text-ui-xs text-foreground-subtle">
+            {accessUrl}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full justify-center"
+            onClick={() => void copyText(accessUrl)}
+          >
+            {formatMessage("settings.remoteAccess.copyLink")}
+          </Button>
+        </div>
       ) : null}
     </SettingsGroupCard>
   );
