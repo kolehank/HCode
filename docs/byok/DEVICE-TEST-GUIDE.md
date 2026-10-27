@@ -23,7 +23,11 @@
 ### 3. 远程访问（手机/浏览器）
 设置 → 远程访问：
 - **open 档**（默认）：desktop 内嵌 `127.0.0.1:30330`。同机浏览器打开即验。
-- **token 档**：生成 token → 出二维码 + 复制链接（`#token=` 片段）。局域网另一设备扫码/输 URL。网卡枚举列表过滤了虚拟网卡；tailscale IP（100.x）有优先建议。
+- **token 档**：生成 token → 出二维码 + 复制链接（`#token=&device=` 片段）。局域网另一设备扫码/输 URL。网卡枚举列表过滤了虚拟网卡；tailscale IP（100.x）有优先建议。侧栏手机图标打开的快捷弹窗复用同一链接（明文仅本机内存保留，应用重启后需重新生成）。
+- **单会话**：同一入口只允许一个网页会话。第二台设备/第二个页面打开同一链接后，前一个页面会提示「已在其他设备登录」并断开；刷新旧页面会反过来接管。**该规则对回环、局域网、临时公网通道一致生效。**
+- **设备标识**：链接里的 `device=` 是桌面机 hostname；token 档会校验它，跨机器直接复制链接访问会得到 403。它不是秘密，真正的凭据仍是 token。
+- **cloudflare-access 档**：逐步测试步骤见 [CLOUDFLARE-ACCESS-TEST-GUIDE.md](CLOUDFLARE-ACCESS-TEST-GUIDE.md)。
+- **临时公网通道（实验）**：token 档下开启「临时公网通道（Cloudflare Quick Tunnel）」，需本机已安装 `cloudflared`（`winget install --id Cloudflare.cloudflared` / `brew install cloudflared`）。开启后设置页与手机弹窗会出现 `https://<随机>.trycloudflare.com` 二维码；地址每次启动/重启通道都会变化，手机需重新扫码。停用或退出应用后确认任务管理器无残留 `cloudflared`。
 - 保存档位后**无需重启**，监听即时重建。
 - 手机接入后跑一轮对话（`web-remote-replayable` 恢复链路：断开重连，会话应恢复）。
 

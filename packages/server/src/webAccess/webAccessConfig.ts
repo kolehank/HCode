@@ -18,6 +18,8 @@ export interface WebAccessConfig {
   mode: WebAccessMode;
   /** BYOK A2：桌面内嵌远程访问入口的启用开关（默认关闭；server 形态不读取此字段）。 */
   desktopEnabled: boolean;
+  /** BYOK A2：临时公网通道（Cloudflare Quick Tunnel）开关；仅 desktop + token 档生效。 */
+  quickTunnelEnabled: boolean;
   /** SHA-256 hex；明文 token 永不落盘。 */
   tokenHash: string;
   tokenPrefix: string;
@@ -41,6 +43,7 @@ const webAccessFileSchema = z.object({
   cfAllowedEmails: z.array(z.string().max(320)).max(1000).default([]),
   externalBaseUrl: z.string().max(2048).default(""),
   desktopEnabled: z.boolean().default(false),
+  quickTunnelEnabled: z.boolean().default(false),
 });
 
 /** 宽松的 PUT 入参 schema：允许省略的字段落到默认值，再由路由层做跨字段校验。 */
@@ -51,6 +54,7 @@ export const webAccessUpdateSchema = z.object({
   cfAllowedEmails: z.array(z.string().max(320)).max(1000).default([]),
   externalBaseUrl: z.string().max(2048).default(""),
   desktopEnabled: z.boolean().optional(),
+  quickTunnelEnabled: z.boolean().optional(),
   regenerate: z.boolean().default(false),
 });
 export type WebAccessUpdateInput = z.infer<typeof webAccessUpdateSchema>;
@@ -75,13 +79,23 @@ export function validateWebAccessUpdateCrossFields(body: WebAccessUpdateInput): 
   return null;
 }
 
-/** 拼访问链接：展示基址（先经 resolveWebAccessDisplayBaseUrl 按回退链解析）+ 一次性明文 token。空基址返回 undefined。 */
-export function buildAccessUrl(externalBaseUrl: string, token: string): string | undefined {
+/**
+ * 拼访问链接：展示基址（先经 resolveWebAccessDisplayBaseUrl 按回退链解析）+ 一次性明文 token。
+ * `deviceName` 存在时追加 `&device=`（本机 hostname，作为链接的设备作用域）；片段不进代理日志。
+ * 空基址返回 undefined。
+ */
+export function buildAccessUrl(
+  externalBaseUrl: string,
+  token: string,
+  deviceName?: string,
+): string | undefined {
   const trimmed = externalBaseUrl.trim().replace(/\/+$/, "");
   if (!trimmed) {
     return undefined;
   }
-  return `${trimmed}/#token=${token}`;
+  const device = deviceName?.trim();
+  const deviceSuffix = device ? `&device=${encodeURIComponent(device)}` : "";
+  return `${trimmed}/#token=${token}${deviceSuffix}`;
 }
 
 export function getDefaultWebAccessConfig(): WebAccessConfig {
@@ -95,6 +109,7 @@ export function getDefaultWebAccessConfig(): WebAccessConfig {
     cfAllowedEmails: [],
     externalBaseUrl: "",
     desktopEnabled: false,
+    quickTunnelEnabled: false,
   };
 }
 
@@ -217,6 +232,7 @@ export function sanitizeWebAccessConfig(config: WebAccessConfig): {
   cfAllowedEmails: string[];
   externalBaseUrl: string;
   desktopEnabled: boolean;
+  quickTunnelEnabled: boolean;
 } {
   return {
     schemaVersion: config.schemaVersion,
@@ -228,5 +244,6 @@ export function sanitizeWebAccessConfig(config: WebAccessConfig): {
     cfAllowedEmails: config.cfAllowedEmails,
     externalBaseUrl: config.externalBaseUrl,
     desktopEnabled: config.desktopEnabled,
+    quickTunnelEnabled: config.quickTunnelEnabled,
   };
 }

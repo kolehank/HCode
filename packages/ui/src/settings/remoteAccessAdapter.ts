@@ -4,7 +4,7 @@
  * - desktop：main 内嵌远程访问入口的 IPC（IPlatformService.webRemoteAccess）。
  * 组件内部状态机只面向 adapter，不感知 IPC 与 HTTP 的差异。 */
 import { fetchWithWebAccessToken } from "@/lib/webAccessToken.js";
-import type { IPlatformService } from "@zcode/shared";
+import type { IPlatformService, QuickTunnelStatus } from "@zcode/shared";
 
 export type WebAccessMode = "open" | "cloudflare-access" | "token";
 
@@ -17,6 +17,8 @@ export interface WebAccessConfigView {
   cfAllowedEmails: string[];
   externalBaseUrl: string;
   port: number;
+  /** 临时公网通道开关（desktop-only；web 形态恒 false）。 */
+  quickTunnelEnabled: boolean;
 }
 
 export interface WebAccessInterfaceItem {
@@ -39,6 +41,8 @@ export interface RemoteAccessLoadResult {
   desktopEnabled?: boolean;
   /** 仅桌面 adapter 返回：web 前端静态资源是否已随包就绪。 */
   webStaticConfigured?: boolean;
+  /** 仅桌面 adapter 返回：临时公网通道状态（URL 仅本进程内存，不落盘）。 */
+  tunnel?: QuickTunnelStatus;
 }
 
 export interface RemoteAccessSavePayload {
@@ -50,6 +54,8 @@ export interface RemoteAccessSavePayload {
   regenerate: boolean;
   /** 仅桌面 adapter 携带。 */
   desktopEnabled?: boolean;
+  /** 仅桌面 adapter 携带；open/CF 档由 main 归一化为 false。 */
+  quickTunnelEnabled?: boolean;
 }
 
 export interface RemoteAccessSaveResult {
@@ -59,6 +65,10 @@ export interface RemoteAccessSaveResult {
   accessUrl?: string;
   /** 保存后内嵌入口的实际监听端口（desktop 保存即时重建监听后非 0；web 形态沿用 load 值）。 */
   port?: number;
+  /** 仅桌面 adapter 返回：保存后的通道状态。 */
+  tunnel?: QuickTunnelStatus;
+  /** 保存后生效的通道开关（main 会把 open/CF 档下的请求归一化为 false）。 */
+  quickTunnelEnabled?: boolean;
 }
 
 export interface RemoteAccessAdapter {
@@ -82,8 +92,13 @@ export function createWebRemoteAccessAdapter(): RemoteAccessAdapter {
         port: number;
       };
       return {
-        config: { ...config, port: interfacesPayload.port || config.port },
+        config: {
+          ...config,
+          port: interfacesPayload.port || config.port,
+          quickTunnelEnabled: config.quickTunnelEnabled ?? false,
+        },
         interfaces: interfacesPayload.interfaces ?? [],
+        tunnel: { state: "disabled" },
       };
     },
     async save(payload) {
@@ -102,6 +117,7 @@ export function createWebRemoteAccessAdapter(): RemoteAccessAdapter {
         ...(result.token ? { token: result.token } : {}),
         ...(result.accessUrl ? { accessUrl: result.accessUrl } : {}),
         ...(result.port ? { port: result.port } : {}),
+        quickTunnelEnabled: result.quickTunnelEnabled,
       };
     },
   };
@@ -126,10 +142,12 @@ export function createDesktopRemoteAccessAdapter(
           cfAllowedEmails: status.cfAllowedEmails,
           externalBaseUrl: status.externalBaseUrl,
           port: status.port ?? 0,
+          quickTunnelEnabled: status.quickTunnelEnabled,
         },
         interfaces: snapshot.interfaces,
         desktopEnabled: status.enabled,
         webStaticConfigured: snapshot.webStaticConfigured,
+        tunnel: status.tunnel,
       };
     },
     async save(payload) {
@@ -141,6 +159,9 @@ export function createDesktopRemoteAccessAdapter(
         externalBaseUrl: payload.externalBaseUrl,
         regenerate: payload.regenerate,
         desktopEnabled: payload.desktopEnabled,
+        ...(payload.quickTunnelEnabled !== undefined
+          ? { quickTunnelEnabled: payload.quickTunnelEnabled }
+          : {}),
       });
       return {
         tokenPrefix: result.status.tokenPrefix,
@@ -149,6 +170,8 @@ export function createDesktopRemoteAccessAdapter(
         ...(result.status.port ? { port: result.status.port } : {}),
         ...(result.token ? { token: result.token } : {}),
         ...(result.accessUrl ? { accessUrl: result.accessUrl } : {}),
+        tunnel: result.status.tunnel,
+        quickTunnelEnabled: result.status.quickTunnelEnabled,
       };
     },
   };

@@ -137,6 +137,7 @@ export {
   buildLocalMediaPreviewUrl,
   createOpenInEditorRemoteTarget,
   resolveWebAccessDisplayBaseUrl,
+  WEB_ACCESS_SESSION_REPLACED_CLOSE_CODE,
 } from "./platform.js";
 export type {
   ArmsCustomEventPayload,
@@ -241,6 +242,10 @@ export type {
   UpdateStatePayload,
   WebAccessInterfaceOption,
   WebAccessModeOption,
+  CloudflaredDetection,
+  QuickTunnelErrorCode,
+  QuickTunnelState,
+  QuickTunnelStatus,
   WebRemoteAccessConfigSnapshot,
   WebRemoteAccessSaveRequest,
   WebRemoteAccessSaveResponse,

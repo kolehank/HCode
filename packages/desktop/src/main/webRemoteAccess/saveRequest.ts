@@ -47,6 +47,9 @@ export function parseSaveRequest(payload: unknown): WebRemoteAccessSaveRequest |
   if (externalBaseUrl !== undefined) request.externalBaseUrl = externalBaseUrl;
   if (cfAllowedEmails !== undefined) request.cfAllowedEmails = cfAllowedEmails;
   if (typeof raw.desktopEnabled === "boolean") request.desktopEnabled = raw.desktopEnabled;
+  if (typeof raw.quickTunnelEnabled === "boolean") {
+    request.quickTunnelEnabled = raw.quickTunnelEnabled;
+  }
   if (typeof raw.regenerate === "boolean") request.regenerate = raw.regenerate;
   return request;
 }

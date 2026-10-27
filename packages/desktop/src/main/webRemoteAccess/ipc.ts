@@ -5,9 +5,11 @@
 import { ipcMain } from "electron";
 import { PlatformChannels } from "@zcode/shared";
 import type {
+  CloudflaredDetection,
   WebAccessInterfaceOption,
   WebRemoteAccessConfigSnapshot,
   WebRemoteAccessSaveResponse,
+  WebRemoteAccessStatus,
 } from "@zcode/shared";
 import { listWebAccessInterfaces } from "@zcode/server";
 import { parseSaveRequest, wrapHandler } from "./saveRequest.js";
@@ -28,11 +30,17 @@ export function registerWebRemoteAccessIpc(options: {
     PlatformChannels.WebAccessGetConfig,
     wrapHandler(
       PlatformChannels.WebAccessGetConfig,
-      async (): Promise<WebRemoteAccessConfigSnapshot> => ({
-        status: controller.getStatus(),
-        interfaces: listWebAccessInterfaces(),
-        webStaticConfigured: Boolean(options.getWebStaticDir()),
-      }),
+      async (): Promise<WebRemoteAccessConfigSnapshot> => {
+        // accessUrl 只经 IPC 暴露（本机受信 renderer）：远程浏览器凭 token 访问的设置页
+        // 走 HTTP /api/web-access/*，那条路径永远不含明文链接。
+        const accessUrl = controller.getActiveAccessUrl();
+        return {
+          status: controller.getStatus(),
+          interfaces: listWebAccessInterfaces(),
+          webStaticConfigured: Boolean(options.getWebStaticDir()),
+          ...(accessUrl ? { accessUrl } : {}),
+        };
+      },
       logger.error,
     ),
   );
@@ -78,6 +86,24 @@ export function registerWebRemoteAccessIpc(options: {
       // preload 的 as 断言不校验运行时形状——QuickDialog 首个消费者直接
       // interfaces.find 崩区域（回归：IPC 返回形状必须与平台契约逐字一致）。
       async (): Promise<WebAccessInterfaceOption[]> => listWebAccessInterfaces(),
+      logger.error,
+    ),
+  );
+
+  ipcMain.handle(
+    PlatformChannels.WebAccessDetectCloudflared,
+    wrapHandler(
+      PlatformChannels.WebAccessDetectCloudflared,
+      async (): Promise<CloudflaredDetection> => controller.detectCloudflared(),
+      logger.error,
+    ),
+  );
+
+  ipcMain.handle(
+    PlatformChannels.WebAccessRestartTunnel,
+    wrapHandler(
+      PlatformChannels.WebAccessRestartTunnel,
+      async (): Promise<WebRemoteAccessStatus> => controller.restartTunnel(),
       logger.error,
     ),
   );

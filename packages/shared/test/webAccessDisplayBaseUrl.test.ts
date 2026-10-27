@@ -1,7 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { resolveWebAccessDisplayBaseUrl } from "../src/platform.js";
 
-describe("resolveWebAccessDisplayBaseUrl（展示回退链：基址 > 建议网卡 > 回环）", () => {
+describe("resolveWebAccessDisplayBaseUrl（展示回退链：隧道 > 基址 > 建议网卡 > 回环）", () => {
+  it("运行中的临时公网通道优先于用户配置基址与建议网卡", () => {
+    expect(
+      resolveWebAccessDisplayBaseUrl({
+        externalBaseUrl: "https://zcode.example.com",
+        mode: "token",
+        port: 30330,
+        suggestedAddress: "192.168.5.9",
+        tunnelUrl: "https://brave-river-1234.trycloudflare.com/",
+      }),
+    ).toBe("https://brave-river-1234.trycloudflare.com");
+  });
+
+  it("隧道 URL 为空/空白时不影响原有回退链", () => {
+    expect(
+      resolveWebAccessDisplayBaseUrl({
+        externalBaseUrl: "",
+        mode: "token",
+        port: 30330,
+        suggestedAddress: "192.168.5.9",
+        tunnelUrl: "   ",
+      }),
+    ).toBe("http://192.168.5.9:30330");
+  });
+
   it("已配置基址：裁尾斜杠后原样返回，任何档位都优先用户配置", () => {
     expect(
       resolveWebAccessDisplayBaseUrl({

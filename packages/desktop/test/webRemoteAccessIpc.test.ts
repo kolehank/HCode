@@ -11,6 +11,7 @@ test("parseSaveRequest 接受合法保存请求并收窄类型", () => {
     externalBaseUrl: "  https://zcode.example.com  ",
     regenerate: false,
     desktopEnabled: true,
+    quickTunnelEnabled: true,
   });
   // 空项必须在此层过滤：allowlist 混入 "" 会把「无 email claim 的合法 JWT」放行
   // （校验端 isEmailAllowlisted 跳过空候选是第二重保险）。
@@ -21,6 +22,7 @@ test("parseSaveRequest 接受合法保存请求并收窄类型", () => {
     cfAllowedEmails: ["a@b.com", "c@d.com"],
     externalBaseUrl: "https://zcode.example.com",
     desktopEnabled: true,
+    quickTunnelEnabled: true,
     regenerate: false,
   });
 });
