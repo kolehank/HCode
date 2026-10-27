@@ -3,7 +3,7 @@
 // 不自动下载、不内置二进制（见 docs/specs/web-remote-access.md「公网临时通道」节）。
 import { access, constants } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import { delimiter, join, win32 } from "node:path";
+import { posix, win32 } from "node:path";
 import type { CloudflaredDetection } from "@zcode/shared";
 
 const VERSION_TIMEOUT_MS = 3_000;
@@ -34,8 +34,10 @@ export function listCloudflaredCandidates(
   const executableNames =
     platform === "win32" ? ["cloudflared.exe", "cloudflared"] : ["cloudflared"];
   // 按目标平台而非宿主平台拼路径/分隔符：单测可在 macOS 上验证 Windows 候选。
-  const pathSeparator = platform === "win32" ? ";" : delimiter;
-  const joinPath = platform === "win32" ? win32.join : join;
+  // 不能取宿主的 path.delimiter / path.join——Windows 宿主上分别是 ";" 与 win32
+  // join，会让 linux 目标的 PATH 切分与候选拼接连环出错（跨平台测试必挂）。
+  const pathSeparator = platform === "win32" ? ";" : ":";
+  const joinPath = platform === "win32" ? win32.join : posix.join;
   for (const dir of (env.PATH ?? "").split(pathSeparator)) {
     const trimmed = dir.trim();
     if (!trimmed) {
