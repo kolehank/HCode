@@ -27,6 +27,7 @@ export {
   isTokenProtectedPath,
   isLoopbackRemoteAddress,
   extractAccessToken,
+  extractAccessDevice,
   authorizeRequest,
   verifyCloudflareAccessJwt,
   isLoopbackWsHostHeader,

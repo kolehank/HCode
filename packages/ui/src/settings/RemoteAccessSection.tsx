@@ -4,6 +4,7 @@
  * 组件内部状态机不变，只换数据源，桌面额外多一个 desktopEnabled 开关。 */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
+import type { CloudflaredDetection, QuickTunnelStatus } from "@zcode/shared";
 import { Button } from "@/components/ui/button.js";
 import { Input } from "@/components/ui/input.js";
 import {
@@ -20,6 +21,7 @@ import { usePlatform } from "@/hooks/usePlatform.js";
 import { logger } from "@/logger.js";
 import { SettingsGroupCard, SettingsRow } from "@/settings/SettingsPageParts.js";
 import { RemoteAccessTokenReveal } from "@/settings/RemoteAccessTokenReveal.js";
+import { RemoteAccessTunnelSection } from "@/settings/RemoteAccessTunnelSection.js";
 import {
   createDesktopRemoteAccessAdapter,
   createWebRemoteAccessAdapter,
@@ -95,6 +97,11 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
   const [saving, setSaving] = useState(false);
   const [desktopEnabled, setDesktopEnabled] = useState(false);
   const [webStaticConfigured, setWebStaticConfigured] = useState(true);
+  const [quickTunnelEnabled, setQuickTunnelEnabled] = useState(false);
+  const [tunnel, setTunnel] = useState<QuickTunnelStatus>({ state: "disabled" });
+  const [cloudflared, setCloudflared] = useState<CloudflaredDetection | null>(null);
+  const [detectingCloudflared, setDetectingCloudflared] = useState(false);
+  const [restartingTunnel, setRestartingTunnel] = useState(false);
   const [oneTimeToken, setOneTimeToken] = useState<{ token: string; accessUrl?: string } | null>(
     null,
   );
@@ -130,6 +137,10 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
         setExternalBaseUrl(config.externalBaseUrl);
         setPort(config.port);
         setInterfaces(result.interfaces);
+        setQuickTunnelEnabled(config.quickTunnelEnabled);
+        if (result.tunnel) {
+          setTunnel(result.tunnel);
+        }
         if (result.desktopEnabled !== undefined) {
           setDesktopEnabled(result.desktopEnabled);
         }
@@ -157,6 +168,72 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
     };
   }, [desktopBridge, isDesktop]);
 
+  // 公网通道 URL 异步解析，保存响应不等待：由 main 推送状态刷新（含每次启动的新 URL）。
+  useEffect(() => {
+    if (!desktopBridge) {
+      return;
+    }
+    return desktopBridge.onTunnelStatusChanged((status) => setTunnel(status));
+  }, [desktopBridge]);
+
+  // 打开设置页时检测一次 cloudflared，用于决定展示安装引导还是状态。
+  useEffect(() => {
+    if (!desktopBridge) {
+      return;
+    }
+    let cancelled = false;
+    void desktopBridge
+      .detectCloudflared()
+      .then((result) => {
+        if (!cancelled) {
+          setCloudflared(result);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [desktopBridge]);
+
+  const detectCloudflaredBinary = useCallback(async () => {
+    if (!desktopBridge) {
+      return;
+    }
+    setDetectingCloudflared(true);
+    try {
+      const result = await desktopBridge.detectCloudflared();
+      setCloudflared(result);
+      // 刚装好 cloudflared 时直接重试通道，省掉用户再点一次「重启通道」。
+      if (result.available && quickTunnelEnabled) {
+        const status = await desktopBridge.restartTunnel();
+        setTunnel(status.tunnel);
+        setQuickTunnelEnabled(status.quickTunnelEnabled);
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      toast(intl.formatMessage({ id: "settings.remoteAccess.saveFailed" }, { detail }));
+    } finally {
+      setDetectingCloudflared(false);
+    }
+  }, [desktopBridge, intl, quickTunnelEnabled]);
+
+  const restartTunnel = useCallback(async () => {
+    if (!desktopBridge) {
+      return;
+    }
+    setRestartingTunnel(true);
+    try {
+      const status = await desktopBridge.restartTunnel();
+      setTunnel(status.tunnel);
+      setQuickTunnelEnabled(status.quickTunnelEnabled);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      toast(intl.formatMessage({ id: "settings.remoteAccess.saveFailed" }, { detail }));
+    } finally {
+      setRestartingTunnel(false);
+    }
+  }, [desktopBridge, intl]);
+
   const save = useCallback(
     async (options: { regenerate: boolean }) => {
       if (mode === "cloudflare-access" && (!cfTeamDomain.trim() || !cfAud.trim())) {
@@ -178,13 +255,20 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
             .filter(Boolean),
           externalBaseUrl: externalBaseUrl.trim(),
           regenerate: options.regenerate,
-          ...(desktopBridge ? { desktopEnabled } : {}),
+          ...(desktopBridge ? { desktopEnabled, quickTunnelEnabled } : {}),
         });
         if (!mountedRef.current) {
           return;
         }
         setTokenPrefix(result.tokenPrefix);
         setHasToken(result.hasToken);
+        if (result.quickTunnelEnabled !== undefined) {
+          // main 会把 open/CF 档下的 quickTunnel 归一化为 false，以响应为准。
+          setQuickTunnelEnabled(result.quickTunnelEnabled);
+        }
+        if (result.tunnel) {
+          setTunnel(result.tunnel);
+        }
         // 保存后同步实际监听端口：加载时 server 未运行 port 为 0，「服务端口」
         // 不显示、网卡联动失效；desktop 保存即时重建监听，port 回来后要刷新。
         if (result.port !== undefined) {
@@ -227,6 +311,7 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
       formatMessage,
       intl,
       mode,
+      quickTunnelEnabled,
     ],
   );
 
@@ -281,7 +366,17 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
             label={formatMessage("settings.remoteAccess.mode.label")}
             description={formatMessage("settings.remoteAccess.mode.description")}
             control={
-              <Select value={mode} onValueChange={(next) => setMode(next as WebAccessMode)}>
+              <Select
+                value={mode}
+                onValueChange={(next) => {
+                  const nextMode = next as WebAccessMode;
+                  setMode(nextMode);
+                  // 公网通道必须 token 档：切走时同步取消勾选（main 侧也会归一化）。
+                  if (nextMode !== "token") {
+                    setQuickTunnelEnabled(false);
+                  }
+                }}
+              >
                 <SelectTrigger size="lg" className="w-64 min-w-0 justify-between">
                   <SelectValue />
                 </SelectTrigger>
@@ -364,6 +459,21 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
           ) : null}
         </SettingsGroupCard>
       </section>
+
+      {desktopBridge ? (
+        <RemoteAccessTunnelSection
+          enabled={quickTunnelEnabled}
+          mode={mode}
+          tunnel={tunnel}
+          detection={cloudflared}
+          detecting={detectingCloudflared}
+          restarting={restartingTunnel}
+          onToggle={setQuickTunnelEnabled}
+          onSwitchToToken={() => setMode("token")}
+          onDetect={() => void detectCloudflaredBinary()}
+          onRestart={() => void restartTunnel()}
+        />
+      ) : null}
 
       <section className="space-y-3">
         <div className="text-ui-base font-medium text-foreground-subtle">

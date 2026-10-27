@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
+  authorizeRequest,
+  extractAccessDevice,
+  generateWebAccessToken,
+  getDefaultWebAccessConfig,
   isAllowedWsOrigin,
   isEmailAllowlisted,
   isLoopbackWsHostHeader,
@@ -69,4 +73,59 @@ test("isEmailAllowlisted：空候选跳过，空 email claim 不因空串候选�
   assert.equal(isEmailAllowlisted(undefined, ["a@b.com"]), false);
   assert.equal(isEmailAllowlisted("a@B.com", [" A@b.com ", ""]), true);
   assert.equal(isEmailAllowlisted("c@d.com", ["a@b.com", ""]), false);
+});
+
+test("extractAccessDevice：HTTP 头优先，WS 从 query 读取", () => {
+  assert.equal(
+    extractAccessDevice({
+      url: "/api/web-access/config",
+      headers: { "x-zcode-device": " my-host " },
+    }),
+    "my-host",
+  );
+  assert.equal(
+    extractAccessDevice({
+      url: "/ws?token=t&device=my-host",
+      headers: {},
+    }),
+    "my-host",
+  );
+  assert.equal(extractAccessDevice({ url: "/ws", headers: {} }), null);
+});
+
+test("token 档鉴权：设备标识缺失 401、不匹配 403、大小写/末尾点容忍", () => {
+  const generated = generateWebAccessToken();
+  const config = {
+    ...getDefaultWebAccessConfig(),
+    mode: "token" as const,
+    tokenHash: generated.tokenHash,
+  };
+  const makeRequest = (url: string, headers: Record<string, string> = {}) => ({
+    url,
+    headers: { authorization: `Bearer ${generated.token}`, ...headers },
+  });
+
+  assert.equal(
+    authorizeRequest(makeRequest("/api/server-info"), config, { expectedDevice: "my-host" }).ok,
+    false,
+  );
+  const mismatch = authorizeRequest(
+    makeRequest("/api/server-info", { "x-zcode-device": "other-host" }),
+    config,
+    { expectedDevice: "my-host" },
+  );
+  assert.equal(mismatch.ok, false);
+  assert.equal(mismatch.ok === false ? mismatch.status : undefined, 403);
+  assert.equal(
+    authorizeRequest(makeRequest("/api/server-info", { "x-zcode-device": "MY-HOST." }), config, {
+      expectedDevice: "my-host",
+    }).ok,
+    true,
+  );
+  assert.equal(
+    authorizeRequest(makeRequest("/ws?token=x&device=my-host"), config, {
+      expectedDevice: "my-host",
+    }).ok,
+    true,
+  );
 });

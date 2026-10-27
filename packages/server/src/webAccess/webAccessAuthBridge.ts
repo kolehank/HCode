@@ -45,6 +45,26 @@ export function extractAccessToken(request: WebAccessRequestLike): string | null
 }
 
 /**
+ * 设备标识（本机 hostname）：HTTP 用 `X-Zcode-Device` 头，WS 用 `?device=`（浏览器 WS 不能带头）。
+ * 值来自访问链接 fragment，由 Web 端读取后转发；它不是秘密，只用于把链接绑定到当前机器。
+ */
+export function extractAccessDevice(request: WebAccessRequestLike): string | null {
+  const headerDevice = request.headers["x-zcode-device"]?.trim();
+  if (headerDevice) {
+    return headerDevice;
+  }
+  if (request.url === "/ws" || request.url.startsWith("/ws?") || request.url.startsWith("/ws/")) {
+    return new URL(`https://local${request.url}`).searchParams.get("device")?.trim() || null;
+  }
+  return null;
+}
+
+/** hostname 大小写不敏感，容忍末尾点（FQDN 写法）。 */
+function normalizeDeviceName(value: string): string {
+  return value.trim().toLowerCase().replace(/\.$/, "");
+}
+
+/**
  * Host 头（"127.0.0.1:30330" / "[::1]:x" / "example.com"）的 hostname 是否 loopback。
  * 仅用于 open 档：open 档监听器被 resolveWebBindHost 强制绑回环，Host 指向其它域名
  * 即 DNS rebinding 特征。token/CF 档不适用——LAN IP、自有域名是合法访问形态。
@@ -185,11 +205,23 @@ export async function verifyCloudflareAccessJwt(
 export function authorizeRequest(
   request: WebAccessRequestLike,
   config: WebAccessConfig,
+  options: { expectedDevice?: string } = {},
 ): WebAccessAuthResult {
   switch (config.mode) {
     case "token": {
       const token = extractAccessToken(request);
       if (token && config.tokenHash && tokenMatchesHash(token, config.tokenHash)) {
+        const expectedDevice = options.expectedDevice?.trim();
+        if (expectedDevice) {
+          const device = extractAccessDevice(request);
+          if (!device) {
+            return { ok: false, status: 401, detail: "missing device identifier" };
+          }
+          if (normalizeDeviceName(device) !== normalizeDeviceName(expectedDevice)) {
+            // 403 而非 401：token 有效但设备作用域不匹配，便于排查链接是否来自另一台机器。
+            return { ok: false, status: 403, detail: "device identifier mismatch" };
+          }
+        }
         return { ok: true };
       }
       return { ok: false, status: 401, detail: "invalid or missing token" };

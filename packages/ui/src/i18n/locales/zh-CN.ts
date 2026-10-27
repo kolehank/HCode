@@ -5248,13 +5248,42 @@ const zhCN: Record<string, string> = {
   "settings.remoteAccess.quick.goSettings": "去设置",
   "settings.remoteAccess.quick.disabledHint": "远程访问尚未开启，请先在设置中开启。",
   "settings.remoteAccess.quick.tokenHint":
-    "当前为 Token 鉴权模式。生成新访问链接后旧链接立即失效。",
+    "Token 模式的完整链接包含明文令牌，只在本机内存保留、不写入磁盘；应用重启后需重新生成。生成新链接后旧链接立即失效。",
   "settings.remoteAccess.quick.noBaseUrlHint":
     "尚未配置外部访问基址，请先在设置中选择网卡或填写基址。",
   "settings.remoteAccess.quick.runningHint": "远程访问入口运行中。",
   "settings.remoteAccess.quick.stoppedHint": "远程访问入口未运行。",
   "settings.remoteAccess.quick.fallbackUrlHint":
     "未配置外部基址，当前为按鉴权模式自动生成的建议地址（仅展示、不落盘）；在设置中配置基址可固定。",
+  "settings.remoteAccess.quick.tunnelEphemeral":
+    "临时公网地址，每次重启会变化；重启后请重新扫码。",
+  "settings.remoteAccess.tunnel.section": "临时公网通道",
+  "settings.remoteAccess.tunnel.enable": "启用临时公网通道（Cloudflare Quick Tunnel）",
+  "settings.remoteAccess.tunnel.enableDescription":
+    "生成随机 trycloudflare.com 地址，无需 Cloudflare 账号；地址每次启动都会变化，仅建议临时使用。",
+  "settings.remoteAccess.tunnel.requiresToken":
+    "临时公网通道需要 Token 鉴权（Quick Tunnel 不提供身份认证）。",
+  "settings.remoteAccess.tunnel.switchToToken": "切换为 Token 鉴权",
+  "settings.remoteAccess.tunnel.warning":
+    "随机地址、每次启动变化；Cloudflare 官方定位为测试用途，无可用性保证，网络环境不佳时可能连不上。",
+  "settings.remoteAccess.tunnel.state.starting": "正在建立临时公网通道…",
+  "settings.remoteAccess.tunnel.state.running": "临时公网通道运行中",
+  "settings.remoteAccess.tunnel.state.stopped": "临时公网通道未运行",
+  "settings.remoteAccess.tunnel.state.binaryMissing":
+    "未检测到 cloudflared，请先安装后点「重新检测」",
+  "settings.remoteAccess.tunnel.state.startFailed": "临时公网通道启动失败",
+  "settings.remoteAccess.tunnel.state.crashed": "临时公网通道反复中断，已停止重试",
+  "settings.remoteAccess.tunnel.copyUrl": "复制地址",
+  "settings.remoteAccess.tunnel.installWindows":
+    "Windows: winget install --id Cloudflare.cloudflared",
+  "settings.remoteAccess.tunnel.installMac": "macOS: brew install cloudflared",
+  "settings.remoteAccess.tunnel.installHint":
+    "Linux 请按 Cloudflare 官方文档安装；安装完成后点「重新检测」。",
+  "settings.remoteAccess.tunnel.redetect": "重新检测",
+  "settings.remoteAccess.tunnel.restart": "重启通道",
+  "settings.remoteAccess.tunnel.unreachable":
+    "公网地址暂时不可达，可能仍在生效中；若手机打不开请稍后重试。",
+  "settings.remoteAccess.tunnel.http2": "已回退到 HTTP/2（TCP 7844）",
   "automations.pageTab.automation": "自动化",
   "automations.pageTab.workflow": "工作流",
   "workflows.hub.description": "保存在已打开项目里的工作流，填好参数就能再跑一次。",

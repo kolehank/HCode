@@ -418,6 +418,12 @@ export const PlatformChannels = {
   WebAccessSaveConfig: "zcode:web-access-save-config",
   /** BYOK A2：枚举本机网卡（过滤虚拟网卡，标注 tailscale 网段与建议项）。 */
   WebAccessGetInterfaces: "zcode:web-access-get-interfaces",
+  /** BYOK A2：检测本机 cloudflared（PATH / 常见安装路径 / ZCODE_CLOUDFLARED_PATH）。 */
+  WebAccessDetectCloudflared: "zcode:web-access-detect-cloudflared",
+  /** BYOK A2：重新拉起临时公网通道（错误态恢复入口）。 */
+  WebAccessRestartTunnel: "zcode:web-access-restart-tunnel",
+  /** BYOK A2：Main → Renderer：临时公网通道状态推送（starting/running/error）。 */
+  WebAccessTunnelStatusChanged: "zcode:web-access-tunnel-status-changed",
   /** Renderer → Main：截取当前窗口作为反馈附件 */
   CaptureWindowScreenshot: "zcode:capture-window-screenshot",
   /**

@@ -886,3 +886,14 @@ exceptions:
       - packages/ui/src/settings/DynamicWorkflowModeSetting.tsx
       - packages/ui/src/store/dynamicWorkflowAvailabilityStore.ts
     reason: Admitted upstream files edited only to let the user's dynamic workflow mode choice always win and keep the settings row visible; adopting packages/shared/src and packages/ui/src needs a separate module boundary refactor.
+  - id: web-remote-access-active-token-cache
+    rule: unmanaged-new-file
+    paths: [packages/desktop/src/main/webRemoteAccess/activeAccessToken.ts]
+    reason: token 明文本进程缓存（spec「token 明文的本进程缓存」节）拆成纯状态机便于单测；webRemoteAccess 目录仍是 legacy desktop 模块，整体 adopt 需要契约与层级梳理，不在本次「手机弹窗展示统一」修复范围内。
+  - id: web-remote-access-quick-tunnel
+    rule: unmanaged-new-file
+    paths:
+      - packages/desktop/src/main/webRemoteAccess/cloudflaredDiscovery.ts
+      - packages/desktop/src/main/webRemoteAccess/quickTunnelProcess.ts
+      - packages/ui/src/settings/RemoteAccessTunnelSection.tsx
+    reason: 临时公网通道（Cloudflare Quick Tunnel）的二进制发现、子进程托管与设置页分区；三者分别拆出以便单测与行数约束。webRemoteAccess 目录与 packages/ui/settings 仍是 legacy 模块，整体 adopt 需要独立边界重构，不在本功能范围内。

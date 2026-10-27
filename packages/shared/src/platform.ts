@@ -1216,11 +1216,49 @@ export interface IPlatformService {
     saveConfig(payload: WebRemoteAccessSaveRequest): Promise<WebRemoteAccessSaveResponse>;
     /** 重新枚举本机网卡候选（过滤虚拟网卡、标注 tailscale 与建议项）。 */
     getInterfaces(): Promise<WebAccessInterfaceOption[]>;
+    /** 检测本机 cloudflared（PATH / 常见安装路径 / ZCODE_CLOUDFLARED_PATH）。 */
+    detectCloudflared(): Promise<CloudflaredDetection>;
+    /** 重新拉起临时公网通道（错误态恢复入口）；返回最新状态。 */
+    restartTunnel(): Promise<WebRemoteAccessStatus>;
+    /** 订阅临时公网通道状态推送（starting/running/error）；返回取消订阅函数。 */
+    onTunnelStatusChanged(listener: (status: QuickTunnelStatus) => void): () => void;
   };
 }
 
 /** BYOK A2：桌面内嵌远程访问的三档鉴权模式；与 @zcode/server 的 WebAccessMode 同构。 */
 export type WebAccessModeOption = "open" | "cloudflare-access" | "token";
+
+/**
+ * 新登录挤掉旧 Web 会话时的 WS 关闭码（应用自定义 4000-4999）。
+ * 浏览器端据此展示「已在其他设备登录」，且不自动重连（当前 Web 入口本身无重连）。
+ */
+export const WEB_ACCESS_SESSION_REPLACED_CLOSE_CODE = 4001;
+
+/** 临时公网通道（Cloudflare Quick Tunnel）状态机。 */
+export type QuickTunnelState = "disabled" | "idle" | "starting" | "running" | "error";
+
+export type QuickTunnelErrorCode = "binary-missing" | "start-failed" | "crashed";
+
+/** 临时公网通道状态视图：URL 仅存 main 内存，经 IPC 暴露，不落盘、不进 HTTP 响应。 */
+export interface QuickTunnelStatus {
+  state: QuickTunnelState;
+  /** 公网地址；仅 state="running" 时存在。每次通道启动都会变化。 */
+  publicUrl?: string;
+  errorCode?: QuickTunnelErrorCode;
+  /** 脱敏后的失败摘要（不含完整 URL）。 */
+  errorDetail?: string;
+  /** 公网可达性探测：undefined=探测中/未探测，false=暂不可达（可能仍在生效）。 */
+  reachable?: boolean;
+  /** 实际传输协议；http2 = QUIC/UDP 不可用后的回退（国内网络常见）。 */
+  transport?: "auto" | "http2";
+}
+
+/** cloudflared 二进制检测结果（不含任何凭据）。 */
+export interface CloudflaredDetection {
+  available: boolean;
+  path?: string;
+  version?: string;
+}
 
 /** 桌面内嵌远程访问入口的运行状态视图（tokenHash 等敏感字段永不进入该视图）。 */
 export interface WebRemoteAccessStatus {
@@ -1237,6 +1275,10 @@ export interface WebRemoteAccessStatus {
   cfAud: string;
   cfAllowedEmails: string[];
   externalBaseUrl: string;
+  /** 临时公网通道开关（磁盘配置）；仅 desktop + token 档生效。 */
+  quickTunnelEnabled: boolean;
+  /** 临时公网通道当前状态；server 形态恒为 disabled。 */
+  tunnel: QuickTunnelStatus;
 }
 
 /** 可直连的本机网卡候选（server 与 desktop 共用同一过滤/建议规则）。 */
@@ -1256,6 +1298,11 @@ export interface WebRemoteAccessConfigSnapshot {
   interfaces: WebAccessInterfaceOption[];
   /** web 前端静态资源目录缺失时为 false：入口只能服务 WS，浏览器打开无页面。 */
   webStaticConfigured: boolean;
+  /**
+   * token 档的完整访问链接（含明文 token），仅当明文由本进程生成且仍在内存时存在。
+   * 仅经 IPC 暴露：不落盘、不出任何 HTTP 响应；应用重启后为空，UI 回到重新生成引导。
+   */
+  accessUrl?: string;
 }
 
 /** WebAccessSaveConfig 请求：字段缺省时保留当前值（与 server PUT 语义一致）。 */
@@ -1266,6 +1313,8 @@ export interface WebRemoteAccessSaveRequest {
   cfAllowedEmails?: string[];
   externalBaseUrl?: string;
   desktopEnabled?: boolean;
+  /** 临时公网通道开关（desktop-only；open/CF 档由 controller 归一化为 false）。 */
+  quickTunnelEnabled?: boolean;
   regenerate?: boolean;
 }
 
@@ -1277,9 +1326,10 @@ export interface WebRemoteAccessSaveResponse {
 }
 
 /**
- * 外部访问基址的展示回退链（spec「外部访问基址」节；唯一来源，UI 弹窗与三处
+ * 外部访问基址的展示回退链（spec「外部访问基址」节；唯一来源，UI 弹窗与所有
  * accessUrl 拼接点共用）：
- *   已配置基址 > 建议网卡地址（仅 token/CF 档）> 本机回环。
+ *   运行中的临时公网通道 URL > 已配置基址 > 建议网卡地址（仅 token/CF 档）> 本机回环。
+ * 隧道 URL 每次启动变化，只用于展示/二维码，绝不写回 externalBaseUrl。
  * open 档监听被强制绑回环，LAN 地址必不可达，回退固定回环；token/CF 档允许
  * 非回环 bind，二维码的意义是给其他设备扫，故优先建议网卡。
  * 回退值仅用于展示（二维码/复制链接），不落盘、不参与 Origin 校验——外部访问
@@ -1290,7 +1340,12 @@ export function resolveWebAccessDisplayBaseUrl(options: {
   mode: WebAccessModeOption;
   port: number;
   suggestedAddress?: string;
+  tunnelUrl?: string;
 }): string {
+  const tunnelUrl = options.tunnelUrl?.trim().replace(/\/+$/, "");
+  if (tunnelUrl) {
+    return tunnelUrl;
+  }
   const trimmed = options.externalBaseUrl.trim().replace(/\/+$/, "");
   if (trimmed) {
     return trimmed;

@@ -629,6 +629,15 @@ const webRemoteAccessController = new WebRemoteAccessController({
     return undefined;
   },
   getWebStaticDir: resolveWebRemoteAccessStaticDir,
+  // 公网通道 URL 解析完成/失败都要即时刷新设置页与手机弹窗：拉取式 getConfig
+  // 只在打开时读一次，必须补状态推送（URL 每次启动都不同）。
+  onTunnelStatusChanged: (status) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send(PlatformChannels.WebAccessTunnelStatusChanged, status);
+      }
+    }
+  },
 });
 
 /** web 前端静态资源目录：打包态 resources/web-dist（extraResources），开发态 packages/web/dist。 */

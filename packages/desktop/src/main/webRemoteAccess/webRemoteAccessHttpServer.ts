@@ -4,6 +4,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
+import { hostname } from "node:os";
 import { extname, join, relative, sep } from "node:path";
 import type { Socket } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
@@ -39,13 +40,20 @@ export interface WebRemoteAccessHttpServerOptions {
   port: number;
   /** Web 前端静态资源目录（安装包 resources/web-dist 或 dev 的 packages/web/dist）。 */
   webStaticDir: string | undefined;
+  /**
+   * 设备标识（本机 hostname）：写进 token 访问链接，并要求 Web 端回传一致的值。
+   * 缺省取 os.hostname()；测试传入固定值以便断言。
+   */
+  deviceName?: string;
   /** WS 升级完成后的客户端接入回调（electron 适配层注入 MessagePort 桥）。 */
   onClientConnected: (ws: WebSocket) => void;
   /**
    * PUT /api/web-access/config 落盘成功且响应已回包后触发（desktop 传入 controller 的
    * 停旧起新重建入口）。必须在响应 end 回调里调用：stop 会终止包括当前连接在内的全部 socket。
+   * 参数是本次 PUT 生成的明文 token（未重新生成时为 undefined）：磁盘只存 hash，
+   * 不回传则 controller 无法在弹窗里复用这条一次性链接。
    */
-  onConfigUpdated?: () => void;
+  onConfigUpdated?: (generatedToken?: string) => void;
   logger: {
     info: (...args: unknown[]) => void;
     warn: (...args: unknown[]) => void;
@@ -83,12 +91,95 @@ const HTTP_REASON_PHRASES: Record<number, string> = {
   401: "Unauthorized",
   403: "Forbidden",
   404: "Not Found",
+  429: "Too Many Requests",
   500: "Internal Server Error",
 };
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(body));
+}
+
+/**
+ * 请求是否来自 Cloudflare 代理/隧道（Quick Tunnel 或用户自建反代）。
+ * 经代理后 socket.remoteAddress 恒为回环，不能再用它判断「本机请求」：
+ * 携带 CF-Connecting-IP / CF-Ray 的请求必须按远程处理（写接口一律拒绝）。
+ */
+export function isProxiedRequest(headers: Record<string, string | undefined>): boolean {
+  return Boolean(
+    headers["cf-connecting-ip"] || headers["cf-ray"] || headers["x-forwarded-for"],
+  );
+}
+
+/** 限流键：优先真实客户端 IP（CF/反代头），否则 socket 地址。 */
+export function resolveAuthFailureKey(
+  headers: Record<string, string | undefined>,
+  remoteAddress: string | undefined,
+): string {
+  const forwarded = firstHeaderValue(headers["cf-connecting-ip"]);
+  if (forwarded?.trim()) {
+    return forwarded.trim();
+  }
+  const forwardedFor = firstHeaderValue(headers["x-forwarded-for"]);
+  if (forwardedFor?.trim()) {
+    return forwardedFor.split(",")[0]!.trim();
+  }
+  return remoteAddress ?? "unknown";
+}
+
+/**
+ * 受保护路径鉴权失败限流（内存滑动窗口）。公网 URL 会被扫描器枚举，
+ * 限流只防资源消耗与日志刷屏，不替代凭据校验。
+ */
+export class AuthFailureLimiter {
+  readonly #failures = new Map<string, number[]>();
+  readonly #maxFailures: number;
+  readonly #windowMs: number;
+  readonly #now: () => number;
+
+  constructor(options: { maxFailures?: number; windowMs?: number; now?: () => number } = {}) {
+    this.#maxFailures = options.maxFailures ?? 10;
+    this.#windowMs = options.windowMs ?? 60_000;
+    this.#now = options.now ?? Date.now;
+  }
+
+  isBlocked(key: string): boolean {
+    return this.#recentFailures(key).length >= this.#maxFailures;
+  }
+
+  noteFailure(key: string): void {
+    // 公网扫描会带来大量一次性客户端 IP：超过阈值先清理过期窗口，避免 map 无界增长。
+    if (!this.#failures.has(key) && this.#failures.size >= 2_000) {
+      this.#pruneExpired();
+    }
+    const recent = this.#recentFailures(key);
+    recent.push(this.#now());
+    this.#failures.set(key, recent);
+  }
+
+  reset(key: string): void {
+    this.#failures.delete(key);
+  }
+
+  #recentFailures(key: string): number[] {
+    const cutoff = this.#now() - this.#windowMs;
+    const recent = (this.#failures.get(key) ?? []).filter((timestamp) => timestamp > cutoff);
+    if (recent.length === 0) {
+      this.#failures.delete(key);
+    } else {
+      this.#failures.set(key, recent);
+    }
+    return recent;
+  }
+
+  #pruneExpired(): void {
+    const cutoff = this.#now() - this.#windowMs;
+    for (const [key, timestamps] of this.#failures) {
+      if (timestamps.every((timestamp) => timestamp <= cutoff)) {
+        this.#failures.delete(key);
+      }
+    }
+  }
 }
 
 /** 与 server 形态 http.ts 的 isInsideDirectory 同一语义：relative 判定拒绝穿越与兄弟目录。 */
@@ -155,6 +246,12 @@ export function startWebRemoteAccessHttpServer(
   options: WebRemoteAccessHttpServerOptions,
 ): Promise<WebRemoteAccessHttpServerHandle> {
   const { config, logger } = options;
+  const deviceName = options.deviceName?.trim() || hostname() || "localhost";
+  // 公网 URL 会被扫描器枚举：受保护路径的连续鉴权失败按客户端限流（仅防资源消耗）。
+  const authFailureLimiter = new AuthFailureLimiter();
+  // 单会话互斥：同一入口同一时刻只允许一个 Web 客户端；后登录挤掉前一个。
+  // 覆盖 open/token/CF 三档与回环/局域网/隧道三种入口（都在这一层升级 WS）。
+  let activeClient: WebSocket | null = null;
   const server: Server = createServer((req, res) => {
     void handleHttpRequest(req, res).catch((error: unknown) => {
       if (!res.headersSent) {
@@ -182,21 +279,29 @@ export function startWebRemoteAccessHttpServer(
     // token 档同步鉴权（/api/* 与 /ws* 升级前必须过）。CF 档在下方异步验签分支处理；
     // authorizeRequest 对 CF 恒拒绝，历史上把 CF 也放进这个分支导致异步分支不可达（死代码）。
     // open 档无应用层鉴权，但浏览器来源校验（Origin/Host）对三档一致生效。
+    const clientKey = resolveAuthFailureKey(requestLike.headers, requestLike.remoteAddress);
     if (isTokenProtectedPath(pathname)) {
+      if (authFailureLimiter.isBlocked(clientKey)) {
+        json(res, 429, { error: "too many failed attempts" });
+        return;
+      }
       const guardHost = firstHeaderValue(req.headers.host);
       if (config.mode === "open" && !isLoopbackWsHostHeader(guardHost)) {
+        authFailureLimiter.noteFailure(clientKey);
         json(res, 403, { error: "host header is not allowed in open mode" });
         return;
       }
       if (
         !isAllowedWsOrigin(firstHeaderValue(req.headers.origin), guardHost, config.externalBaseUrl)
       ) {
+        authFailureLimiter.noteFailure(clientKey);
         json(res, 403, { error: "cross-origin request is not allowed" });
         return;
       }
       if (config.mode === "token") {
-        const auth = authorizeRequest(requestLike, config);
+        const auth = authorizeRequest(requestLike, config, { expectedDevice: deviceName });
         if (!auth.ok) {
+          authFailureLimiter.noteFailure(clientKey);
           json(res, auth.status, { error: auth.detail });
           return;
         }
@@ -207,6 +312,7 @@ export function startWebRemoteAccessHttpServer(
           config,
         );
         if (!result.ok) {
+          authFailureLimiter.noteFailure(clientKey);
           json(res, result.status, { error: result.detail });
           return;
         }
@@ -254,7 +360,15 @@ export function startWebRemoteAccessHttpServer(
     }
     const isWrite = req.method !== "GET";
     const loopbackRequired = config.mode === "open" || isWrite;
-    if (loopbackRequired && !isLoopbackRemoteAddress(requestLike.remoteAddress)) {
+    // 经 Cloudflare/反代转发的请求 socket 地址恒为回环：不能据此放行写接口，
+    // 否则远程持有 token 的客户端可以直接改配置（Quick Tunnel 场景的必修复项）。
+    if (
+      loopbackRequired &&
+      (!isLoopbackRemoteAddress(requestLike.remoteAddress) || isProxiedRequest(requestLike.headers))
+    ) {
+      authFailureLimiter.noteFailure(
+        resolveAuthFailureKey(requestLike.headers, requestLike.remoteAddress),
+      );
       json(res, 403, { error: "web access config requires loopback" });
       return;
     }
@@ -356,12 +470,13 @@ export function startWebRemoteAccessHttpServer(
                     )?.address,
                   }),
                   generated.token,
+                  deviceName,
                 ),
               }
             : {}),
         }),
         () => {
-          options.onConfigUpdated?.();
+          options.onConfigUpdated?.(generated?.token);
         },
       );
     } catch (error) {
@@ -391,11 +506,17 @@ export function startWebRemoteAccessHttpServer(
       headers: req.headers as Record<string, string | undefined>,
       remoteAddress: req.socket.remoteAddress,
     };
+    const clientKey = resolveAuthFailureKey(requestLike.headers, requestLike.remoteAddress);
+    if (authFailureLimiter.isBlocked(clientKey)) {
+      rejectUpgrade(socket, 429);
+      return;
+    }
     const guardHost = firstHeaderValue(req.headers.host);
     const guardOrigin = firstHeaderValue(req.headers.origin);
     // open 档绑定被强制在回环上，但本机浏览器就运行在回环：WebSocket 不受 CORS 约束，
     // 恶意网页可直接握手，因此 Host/Origin 校验是 open 档唯一的浏览器侧防线。
     if (config.mode === "open" && !isLoopbackWsHostHeader(guardHost)) {
+      authFailureLimiter.noteFailure(clientKey);
       logger.warn(
         `[web-remote-access] upgrade rejected: host not loopback in open mode host=${guardHost}`,
       );
@@ -403,15 +524,43 @@ export function startWebRemoteAccessHttpServer(
       return;
     }
     if (!isAllowedWsOrigin(guardOrigin, guardHost, config.externalBaseUrl)) {
+      authFailureLimiter.noteFailure(clientKey);
       logger.warn(
         `[web-remote-access] upgrade rejected: cross-origin origin=${guardOrigin} host=${guardHost}`,
       );
       rejectUpgrade(socket, 403);
       return;
     }
+    const attachClient = (ws: WebSocket): void => {
+      const previous = activeClient;
+      activeClient = ws;
+      if (previous && previous !== ws) {
+        // 后登录挤掉前一个：先走正常 close 让旧页面收到 4001 并展示提示；
+        // 2s 内没关掉再强断，避免旧桥长期占着 MessagePort。
+        logger.info("[web-remote-access] replacing active web session");
+        try {
+          previous.close(4001, "session replaced by a newer login");
+        } catch {
+          previous.terminate();
+        }
+        const forceTimer = setTimeout(() => {
+          if (previous.readyState !== 3) {
+            previous.terminate();
+          }
+        }, 2_000);
+        forceTimer.unref?.();
+        previous.once("close", () => clearTimeout(forceTimer));
+      }
+      ws.once("close", () => {
+        if (activeClient === ws) {
+          activeClient = null;
+        }
+      });
+      options.onClientConnected(ws);
+    };
     const proceed = () => {
       wss.handleUpgrade(req, socket, head, (ws) => {
-        options.onClientConnected(ws);
+        attachClient(ws);
       });
     };
     if (config.mode === "cloudflare-access") {
@@ -420,6 +569,7 @@ export function startWebRemoteAccessHttpServer(
         config,
       ).then((result) => {
         if (!result.ok) {
+          authFailureLimiter.noteFailure(clientKey);
           logger.warn(
             `[web-remote-access] upgrade rejected by cf verification: status=${result.status} detail=${result.detail}`,
           );
@@ -430,8 +580,9 @@ export function startWebRemoteAccessHttpServer(
       });
       return;
     }
-    const auth = authorizeRequest(requestLike, config);
+    const auth = authorizeRequest(requestLike, config, { expectedDevice: deviceName });
     if (!auth.ok) {
+      authFailureLimiter.noteFailure(clientKey);
       logger.warn(
         `[web-remote-access] upgrade rejected: status=${auth.status} detail=${auth.detail}`,
       );

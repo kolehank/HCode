@@ -1,4 +1,7 @@
-import { mobilePluginDiscoveryTelemetrySchema } from "@zcode/shared";
+import {
+  mobilePluginDiscoveryTelemetrySchema,
+  WEB_ACCESS_SESSION_REPLACED_CLOSE_CODE,
+} from "@zcode/shared";
 import {
   sessionCreateTelemetrySchema,
   type RendererTelemetryEventPayload,
@@ -950,7 +953,20 @@ async function bootstrapWebApp() {
 
   try {
     const services = await connectViaWebSocket(bootstrap.wsUrl, {
-      onClose: () => {},
+      onClose: (event) => {
+        // 单会话互斥：新登录会以 4001 关闭旧连接。旧页面必须明确提示且不重连
+        // （本入口本身没有自动重连；刷新即重新登录、反过来挤掉新会话）。
+        if (event.code === WEB_ACCESS_SESSION_REPLACED_CLOSE_CODE) {
+          const locale = resolveWebRemoteControlScreenLocale(navigator.language);
+          renderWebRemoteControlFailure({
+            reason: "session-conflict",
+            message:
+              locale === "zh-CN"
+                ? "已在其他设备登录，本页面已退出。刷新页面可重新接管。"
+                : "Signed in from another device; this page has been signed out. Reload to take over again.",
+          });
+        }
+      },
     });
     const platform = createWebPlatform();
     document.title = "ZCode - Web + Server";

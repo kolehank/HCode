@@ -5526,13 +5526,43 @@ const enUS: Record<string, string> = {
   "settings.remoteAccess.quick.disabledHint":
     "Remote access is not enabled yet. Enable it in settings first.",
   "settings.remoteAccess.quick.tokenHint":
-    "Token auth mode. Generating a new link invalidates the old one immediately.",
+    "Token mode links contain the plaintext token, kept in local memory only and never written to disk; regenerate after restarting the app. Generating a new link invalidates the old one immediately.",
   "settings.remoteAccess.quick.noBaseUrlHint":
     "No external base URL configured yet. Pick a network interface or set a base URL in settings.",
   "settings.remoteAccess.quick.runningHint": "Remote access entry is running.",
   "settings.remoteAccess.quick.stoppedHint": "Remote access entry is not running.",
   "settings.remoteAccess.quick.fallbackUrlHint":
     "No external base URL configured. This auto-generated address follows the auth mode (display only, not persisted); set a base URL in settings to pin it.",
+  "settings.remoteAccess.quick.tunnelEphemeral":
+    "Temporary public address that changes on restart; scan again after restarting.",
+  "settings.remoteAccess.tunnel.section": "Temporary public tunnel",
+  "settings.remoteAccess.tunnel.enable":
+    "Enable temporary public tunnel (Cloudflare Quick Tunnel)",
+  "settings.remoteAccess.tunnel.enableDescription":
+    "Creates a random trycloudflare.com address without a Cloudflare account. The address changes every launch; intended for temporary use only.",
+  "settings.remoteAccess.tunnel.requiresToken":
+    "The temporary tunnel requires Token authentication (Quick Tunnel provides no identity layer).",
+  "settings.remoteAccess.tunnel.switchToToken": "Switch to Token auth",
+  "settings.remoteAccess.tunnel.warning":
+    "Random address that changes each launch. Cloudflare positions Quick Tunnels for testing only, with no availability guarantee; unreliable networks may not connect.",
+  "settings.remoteAccess.tunnel.state.starting": "Establishing temporary tunnel…",
+  "settings.remoteAccess.tunnel.state.running": "Temporary tunnel is running",
+  "settings.remoteAccess.tunnel.state.stopped": "Temporary tunnel is not running",
+  "settings.remoteAccess.tunnel.state.binaryMissing":
+    "cloudflared not found. Install it, then click \"Detect again\".",
+  "settings.remoteAccess.tunnel.state.startFailed": "Temporary tunnel failed to start",
+  "settings.remoteAccess.tunnel.state.crashed": "Tunnel kept failing; retries stopped",
+  "settings.remoteAccess.tunnel.copyUrl": "Copy address",
+  "settings.remoteAccess.tunnel.installWindows":
+    "Windows: winget install --id Cloudflare.cloudflared",
+  "settings.remoteAccess.tunnel.installMac": "macOS: brew install cloudflared",
+  "settings.remoteAccess.tunnel.installHint":
+    "On Linux, install via the official Cloudflare guide, then click \"Detect again\".",
+  "settings.remoteAccess.tunnel.redetect": "Detect again",
+  "settings.remoteAccess.tunnel.restart": "Restart tunnel",
+  "settings.remoteAccess.tunnel.unreachable":
+    "The public address is not reachable yet; it may still be propagating. Try again in a moment if your phone cannot open it.",
+  "settings.remoteAccess.tunnel.http2": "Fell back to HTTP/2 (TCP 7844)",
   "automations.pageTab.automation": "Automations",
   "automations.pageTab.workflow": "Workflows",
   "workflows.hub.description":

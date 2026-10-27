@@ -32,7 +32,9 @@ interface QuickAccessState {
   status: WebRemoteAccessStatus | null;
   /** 网卡候选（与 getConfig 并行拉取；展示回退链取建议网卡）。 */
   interfaces: WebAccessInterfaceOption[];
-  /** token 模式重新生成后的一次性明文链接。 */
+  /** 本进程内已生成并缓存的 token 链接（设置页或上次弹窗生成；明文不落盘）。 */
+  cachedAccessUrl: string | null;
+  /** token 模式在本次弹窗内重新生成后拿到的一次性明文链接。 */
   regeneratedUrl: string | null;
   errorDetail: string | null;
 }
@@ -41,9 +43,16 @@ const INITIAL_STATE: QuickAccessState = {
   phase: "loading",
   status: null,
   interfaces: [],
+  cachedAccessUrl: null,
   regeneratedUrl: null,
   errorDetail: null,
 };
+
+/** 通道重启后只换域名：保留原链接的 #token= 片段，避免展示已失效的旧公网地址。 */
+function rebaseAccessUrl(accessUrl: string, baseUrl: string): string {
+  const hashIndex = accessUrl.indexOf("#");
+  return hashIndex >= 0 ? `${baseUrl}${accessUrl.slice(hashIndex)}` : accessUrl;
+}
 
 export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComponent({
   open,
@@ -58,6 +67,7 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
   const tabStoreApi = useTabStoreApi();
   const [state, setState] = useState<QuickAccessState>(INITIAL_STATE);
   const [regenerating, setRegenerating] = useState(false);
+  const [restartingTunnel, setRestartingTunnel] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -87,6 +97,7 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
           phase: "ready",
           status: snapshot.status,
           interfaces,
+          cachedAccessUrl: snapshot.accessUrl ?? null,
           regeneratedUrl: null,
           errorDetail: null,
         });
@@ -100,6 +111,22 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
     return () => {
       cancelled = true;
     };
+  }, [open, platform]);
+
+  // 公网通道 URL 在弹窗打开后才解析完成：订阅 main 推送，避免二维码用旧地址。
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const bridge = platform.webRemoteAccess;
+    if (!bridge) {
+      return;
+    }
+    return bridge.onTunnelStatusChanged((tunnel) => {
+      setState((prev) =>
+        prev.status ? { ...prev, status: { ...prev.status, tunnel } } : prev,
+      );
+    });
   }, [open, platform]);
 
   const regenerateTokenUrl = useCallback(async () => {
@@ -118,6 +145,11 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
       });
       setState((prev) => ({
         ...prev,
+        // 重新生成后监听可能刚重建：端口/running 必须以保存响应为准，
+        // 否则二维码基于旧端口，手机扫码打不开。
+        status: result.status,
+        // 旧明文已随重新生成失效，不能用 prev.cachedAccessUrl 兜底。
+        cachedAccessUrl: result.accessUrl ?? null,
         regeneratedUrl: result.accessUrl ?? null,
       }));
     } catch (error) {
@@ -128,6 +160,22 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
       setRegenerating(false);
     }
   }, [intl, platform, state.status]);
+
+  const restartTunnel = useCallback(async () => {
+    const bridge = platform.webRemoteAccess;
+    if (!bridge) return;
+    setRestartingTunnel(true);
+    try {
+      const status = await bridge.restartTunnel();
+      setState((prev) => ({ ...prev, status }));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      logger.error("[remoteAccessQuick] 重启临时公网通道失败", { error: detail });
+      toast(intl.formatMessage({ id: "settings.remoteAccess.saveFailed" }, { detail }));
+    } finally {
+      setRestartingTunnel(false);
+    }
+  }, [intl, platform]);
 
   const copyLink = useCallback(
     async (value: string) => {
@@ -149,7 +197,9 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
   }, [onOpenChange, tabStoreApi]);
 
   const status = state.status;
-  // 展示回退链（shared 单一来源）：已配置基址 > 建议网卡（仅 token/CF 档）> 回环。
+  // 临时公网通道 URL 优先于基址/网卡（仅展示，不落盘）：每次通道启动都会变化。
+  const tunnelUrl = status?.tunnel.state === "running" ? status.tunnel.publicUrl : undefined;
+  // 展示回退链（shared 单一来源）：隧道 > 已配置基址 > 建议网卡（仅 token/CF 档）> 回环。
   // port 未就绪（server 未运行）时为空串，按无链接处理。
   const suggested = state.interfaces.find((item) => item.suggested) ?? state.interfaces[0] ?? null;
   const displayBaseUrl =
@@ -159,15 +209,28 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
           mode: status.mode,
           port: status.port ?? 0,
           suggestedAddress: suggested?.address,
+          tunnelUrl,
         })
       : "";
-  // open/CF 档二维码内容就是地址本身（无 token）；token 档必须带 #token=，
-  // 只有 regenerate 拿到的一次性明文链接可作二维码内容（无则走 regenerate 引导）。
-  const accessUrl =
-    state.regeneratedUrl ?? (displayBaseUrl && status?.mode !== "token" ? displayBaseUrl : "");
+  // 三档统一展示「二维码 + 完整链接 + 复制链接」：
+  // - open / CF 档：链接就是展示基址（CF 身份在边缘完成，不带 token 片段）；
+  // - token 档：优先本次弹窗生成的一次性链接，其次本进程缓存（设置页生成的明文只在内存）。
+  //   token 明文只存在链接里：通道重开后用新域名替换前缀、保留 #token= 片段。
+  //   两者都没有（典型是应用刚重启）才走重新生成引导——磁盘只存 hash，无法还原明文。
+  // 监听未运行时不展示链接，避免给出必然打不开的地址。
+  const tokenLink = state.regeneratedUrl ?? state.cachedAccessUrl ?? "";
+  const accessUrl = !status?.running
+    ? ""
+    : status.mode === "token"
+      ? tokenLink && tunnelUrl
+        ? rebaseAccessUrl(tokenLink, tunnelUrl)
+        : tokenLink
+      : displayBaseUrl;
+  // 基址为空且没有公网通道时，二维码内容来自回退链（建议网卡/回环），必须提示「仅展示、不落盘」。
   const isFallbackUrl =
-    !state.regeneratedUrl && !status?.externalBaseUrl.trim() && Boolean(accessUrl);
-  const tokenReady = status?.enabled && status.mode === "token" && state.regeneratedUrl;
+    Boolean(accessUrl) && !status?.externalBaseUrl.trim() && !tunnelUrl;
+  const tunnelStarting = status?.quickTunnelEnabled && status.tunnel.state === "starting";
+  const tunnelFailed = status?.quickTunnelEnabled && status.tunnel.state === "error";
 
   const renderBody = () => {
     if (state.phase === "loading") {
@@ -203,18 +266,73 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
         </section>
       );
     }
-    if (status.mode === "token" && !tokenReady) {
+    if (tunnelStarting) {
       return (
-        <section className="flex min-h-[220px] flex-col justify-center gap-3 rounded-xl border border-border bg-card p-4">
-          <p className="text-ui-base/relaxed text-foreground-subtle">
-            {formatMessage("settings.remoteAccess.quick.tokenHint")}
+        <section className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-5">
+          <LoaderCircle className="size-6 animate-spin text-foreground-subtle" aria-hidden="true" />
+          <p className="text-center text-ui-base/relaxed text-foreground-subtle">
+            {formatMessage("settings.remoteAccess.tunnel.state.starting")}
           </p>
-          <Button type="button" disabled={regenerating} onClick={() => void regenerateTokenUrl()}>
+        </section>
+      );
+    }
+    if (tunnelFailed) {
+      return (
+        <section className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-5">
+          <p className="text-center text-ui-base/relaxed text-foreground-subtle">
+            {formatMessage(
+              status.tunnel.errorCode === "binary-missing"
+                ? "settings.remoteAccess.tunnel.state.binaryMissing"
+                : status.tunnel.errorCode === "crashed"
+                  ? "settings.remoteAccess.tunnel.state.crashed"
+                  : "settings.remoteAccess.tunnel.state.startFailed",
+            )}
+          </p>
+          {status.tunnel.errorDetail ? (
+            <p className="w-full break-all rounded-md bg-surface px-3 py-2 text-ui-xs text-foreground-subtle">
+              {status.tunnel.errorDetail}
+            </p>
+          ) : null}
+          <Button
+            type="button"
+            className="w-full justify-center"
+            disabled={restartingTunnel}
+            onClick={() => void restartTunnel()}
+          >
+            {restartingTunnel ? (
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+            ) : null}
+            {formatMessage("settings.remoteAccess.tunnel.restart")}
+          </Button>
+          <Button type="button" variant="outline" onClick={openSettingsRemoteAccess}>
+            {formatMessage("settings.remoteAccess.quick.goSettings")}
+          </Button>
+        </section>
+      );
+    }
+    if (status.mode === "token" && !accessUrl) {
+      // 与二维码卡同构（顶部预留二维码位）：明文缺失是状态差异，不是视觉差异。
+      return (
+        <section className="flex flex-col items-center gap-4 rounded-xl border border-border bg-card p-5">
+          <div className="flex size-24 items-center justify-center rounded-xl border border-dashed border-border text-foreground-subtle">
+            <QrCodeIcon className="size-10" aria-hidden="true" />
+          </div>
+          <p className="text-center text-ui-base/relaxed text-foreground-subtle">
+            {formatMessage(
+              status.running
+                ? "settings.remoteAccess.quick.tokenHint"
+                : "settings.remoteAccess.quick.stoppedHint",
+            )}
+          </p>
+          <Button
+            type="button"
+            className="w-full justify-center"
+            disabled={regenerating}
+            onClick={() => void regenerateTokenUrl()}
+          >
             {regenerating ? (
               <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <QrCodeIcon className="size-4" aria-hidden="true" />
-            )}
+            ) : null}
             {formatMessage(
               status.hasToken
                 ? "settings.remoteAccess.token.regenerate"
@@ -228,7 +346,11 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
       return (
         <section className="flex min-h-[220px] flex-col justify-center gap-3 rounded-xl border border-border bg-card p-4">
           <p className="text-ui-base/relaxed text-foreground-subtle">
-            {formatMessage("settings.remoteAccess.quick.noBaseUrlHint")}
+            {formatMessage(
+              status.running
+                ? "settings.remoteAccess.quick.noBaseUrlHint"
+                : "settings.remoteAccess.quick.stoppedHint",
+            )}
           </p>
           <Button type="button" onClick={openSettingsRemoteAccess}>
             {formatMessage("settings.remoteAccess.quick.goSettings")}
@@ -242,6 +364,16 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
         <div className="w-full break-all rounded-md bg-surface px-3 py-2 text-center font-mono text-ui-xs text-foreground-subtle">
           {accessUrl}
         </div>
+        {tunnelUrl ? (
+          <p className="text-ui-xs text-foreground-subtle">
+            {formatMessage("settings.remoteAccess.quick.tunnelEphemeral")}
+          </p>
+        ) : null}
+        {tunnelUrl && status.tunnel.reachable === false ? (
+          <p className="text-ui-xs text-foreground-subtle">
+            {formatMessage("settings.remoteAccess.tunnel.unreachable")}
+          </p>
+        ) : null}
         {isFallbackUrl ? (
           <p className="text-ui-xs text-foreground-subtle">
             {formatMessage("settings.remoteAccess.quick.fallbackUrlHint")}
@@ -268,6 +400,20 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
               <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
             ) : null}
             {formatMessage("settings.remoteAccess.token.regenerate")}
+          </Button>
+        ) : null}
+        {status.quickTunnelEnabled ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={restartingTunnel}
+            onClick={() => void restartTunnel()}
+          >
+            {restartingTunnel ? (
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+            ) : null}
+            {formatMessage("settings.remoteAccess.tunnel.restart")}
           </Button>
         ) : null}
         {copied ? (

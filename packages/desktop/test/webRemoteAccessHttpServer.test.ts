@@ -12,6 +12,9 @@ import {
   type WebAccessConfig,
 } from "@zcode/server";
 import {
+  AuthFailureLimiter,
+  isProxiedRequest,
+  resolveAuthFailureKey,
   startWebRemoteAccessHttpServer,
   type WebRemoteAccessHttpServerHandle,
 } from "../src/main/webRemoteAccess/webRemoteAccessHttpServer.js";
@@ -26,6 +29,20 @@ interface TestFixture {
 
 const noopLogger = { info: () => {}, warn: () => {}, error: () => {} };
 
+/** 固定设备标识（默认实现取 os.hostname()，测试注入以便断言链接与鉴权）。 */
+const TEST_DEVICE = "test-host";
+
+function authHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    "X-Zcode-Device": TEST_DEVICE,
+  };
+}
+
+function wsPath(token: string): string {
+  return `/ws?token=${encodeURIComponent(token)}&device=${encodeURIComponent(TEST_DEVICE)}`;
+}
+
 function makeConfig(overrides: Partial<WebAccessConfig>): WebAccessConfig {
   return { ...getDefaultWebAccessConfig(), ...overrides };
 }
@@ -33,7 +50,7 @@ function makeConfig(overrides: Partial<WebAccessConfig>): WebAccessConfig {
 async function startFixture(
   config: WebAccessConfig,
   onClientConnected: (ws: import("ws").WebSocket) => void = () => {},
-  onConfigUpdated?: () => void,
+  onConfigUpdated?: (generatedToken?: string) => void,
 ): Promise<TestFixture> {
   // staticDir 是 baseDir 的子目录：穿越测试需要一个位于静态根之外的同级文件。
   const baseDir = await mkdtemp(join(tmpdir(), "zcode-web-ra-test-"));
@@ -45,6 +62,7 @@ async function startFixture(
     bindHost: "127.0.0.1",
     port: 0,
     webStaticDir: staticDir,
+    deviceName: TEST_DEVICE,
     onClientConnected,
     onConfigUpdated,
     logger: noopLogger,
@@ -148,12 +166,24 @@ test("token 档：无 token 401，带 token 升级成功，token + 跨源 Origin
   onTestFinished(() => fixture.handle.stop());
   const noToken = await rawUpgrade(fixture.port, "/ws", {});
   assert.equal(noToken.status, 401);
-  const withToken = await rawUpgrade(fixture.port, `/ws?token=${generated.token}`, {
+  // 只有 token、缺设备标识：token 档同样拒绝（访问链接必须带 #device=）。
+  const noDevice = await rawUpgrade(fixture.port, `/ws?token=${generated.token}`, {
+    host: `127.0.0.1:${fixture.port}`,
+  });
+  assert.equal(noDevice.status, 401);
+  const withToken = await rawUpgrade(fixture.port, wsPath(generated.token), {
     host: `127.0.0.1:${fixture.port}`,
   });
   assert.equal(withToken.upgraded, true);
+  // 设备标识不匹配：token 有效也拒绝（403），链接不能跨机器直接复用。
+  const wrongDevice = await rawUpgrade(
+    fixture.port,
+    `/ws?token=${generated.token}&device=another-host`,
+    { host: `127.0.0.1:${fixture.port}` },
+  );
+  assert.equal(wrongDevice.status, 403);
   // token 不豁免来源校验：浏览器侧防线独立于凭据。
-  const tokenCrossOrigin = await rawUpgrade(fixture.port, `/ws?token=${generated.token}`, {
+  const tokenCrossOrigin = await rawUpgrade(fixture.port, wsPath(generated.token), {
     host: `127.0.0.1:${fixture.port}`,
     origin: "http://evil.com",
   });
@@ -161,6 +191,36 @@ test("token 档：无 token 401，带 token 升级成功，token + 跨源 Origin
   // HTTP 侧：无 token 的 /api/* 请求 401。
   const apiNoToken = await httpGet(fixture.port, "/api/anything");
   assert.equal(apiNoToken.status, 401);
+});
+
+test("单会话：后登录以 4001 关闭前一个连接，新连接保持可用", async () => {
+  const generated = generateWebAccessToken();
+  const fixture = await startFixture(
+    makeConfig({ mode: "token", tokenHash: generated.tokenHash }),
+  );
+  onTestFinished(() => fixture.handle.stop());
+
+  const openWs = (): Promise<WebSocket> =>
+    new Promise((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${fixture.port}${wsPath(generated.token)}`);
+      ws.once("open", () => resolve(ws));
+      ws.once("error", reject);
+    });
+
+  const first = await openWs();
+  const firstClosed = new Promise<number>((resolve) => {
+    first.once("close", (code) => resolve(code));
+  });
+  const second = await openWs();
+  assert.equal(await firstClosed, 4001);
+
+  const secondClosed = new Promise<number>((resolve) => {
+    second.once("close", (code) => resolve(code));
+  });
+  const third = await openWs();
+  assert.equal(await secondClosed, 4001);
+  assert.equal(third.readyState, WebSocket.OPEN);
+  third.close();
 });
 
 test("CF 档：HTTP 缺 JWT 头 401 且走异步验签分支（detail 证明分支可达）", async () => {
@@ -355,11 +415,13 @@ test("open 档：本机浏览器 PUT 保存落盘（用户场景），非法入�
 test("token 档：GET 需凭据，PUT regenerate 返回一次性 token 并触发 onConfigUpdated", async () => {
   const initial = generateWebAccessToken();
   let configUpdatedCount = 0;
+  const updatedTokens: Array<string | undefined> = [];
   const fixture = await startFixture(
     makeConfig({ mode: "token", tokenHash: initial.tokenHash, tokenPrefix: initial.tokenPrefix }),
     () => {},
-    () => {
+    (generatedToken) => {
       configUpdatedCount += 1;
+      updatedTokens.push(generatedToken);
     },
   );
   isolateConfigDir(fixture.baseDir);
@@ -378,9 +440,11 @@ test("token 档：GET 需凭据，PUT regenerate 返回一次性 token 并触发
   const unauthorized = await httpGet(fixture.port, "/api/web-access/config");
   assert.equal(unauthorized.status, 401);
 
-  const readView = await httpGet(fixture.port, "/api/web-access/config", {
-    Authorization: `Bearer ${initial.token}`,
-  });
+  const readView = await httpGet(
+    fixture.port,
+    "/api/web-access/config",
+    authHeaders(initial.token),
+  );
   assert.equal(readView.status, 200);
   assert.equal(JSON.parse(readView.body).tokenPrefix, initial.tokenPrefix);
 
@@ -395,7 +459,7 @@ test("token 档：GET 需凭据，PUT regenerate 返回一次性 token 并触发
       externalBaseUrl: "http://192.168.1.9:30330",
       regenerate: true,
     }),
-    { Authorization: `Bearer ${initial.token}` },
+    { Authorization: `Bearer ${initial.token}`, "X-Zcode-Device": TEST_DEVICE },
   );
   assert.equal(saved.status, 200);
   const savedBody = JSON.parse(saved.body) as {
@@ -404,20 +468,27 @@ test("token 档：GET 需凭据，PUT regenerate 返回一次性 token 并触发
     tokenPrefix: string;
   };
   assert.ok(savedBody.token && savedBody.token !== initial.token);
-  assert.equal(savedBody.accessUrl, `http://192.168.1.9:30330/#token=${savedBody.token}`);
+  assert.equal(
+    savedBody.accessUrl,
+    `http://192.168.1.9:30330/#token=${savedBody.token}&device=${TEST_DEVICE}`,
+  );
 
   // 鉴权快照按「启动时快照；改动重启生效」语义仍认旧 token；磁盘 hash 已更新——
   // GET 视图（读磁盘）回新前缀。旧 token 真正失效发生在 controller restartFromDisk
   // 用新配置重建监听之后（controller 层职责，不在本层断言）。
-  const diskView = await httpGet(fixture.port, "/api/web-access/config", {
-    Authorization: `Bearer ${initial.token}`,
-  });
+  const diskView = await httpGet(
+    fixture.port,
+    "/api/web-access/config",
+    authHeaders(initial.token),
+  );
   assert.equal(diskView.status, 200);
   assert.equal(JSON.parse(diskView.body).tokenPrefix, savedBody.tokenPrefix);
 
   // 回包完成后才触发重建回调（controller 在真实链路里据此停旧起新）。
   await new Promise((resolve) => setTimeout(resolve, 50));
   assert.equal(configUpdatedCount, 1);
+  // 明文必须随回调交给 controller：磁盘只有 hash，否则手机弹窗无法复用这条一次性链接。
+  assert.equal(updatedTokens[0], savedBody.token);
 
   const unauthorizedPut = await httpPut(
     fixture.port,
@@ -425,4 +496,121 @@ test("token 档：GET 需凭据，PUT regenerate 返回一次性 token 并触发
     JSON.stringify({ mode: "token" }),
   );
   assert.equal(unauthorizedPut.status, 401);
+});
+
+test("token 档：基址留空时 PUT regenerate 仍返回回退链接（弹窗可直接出二维码）", async () => {
+  const initial = generateWebAccessToken();
+  const fixture = await startFixture(
+    makeConfig({ mode: "token", tokenHash: initial.tokenHash, tokenPrefix: initial.tokenPrefix }),
+  );
+  isolateConfigDir(fixture.baseDir);
+  await seedConfigFile(
+    fixture.baseDir,
+    makeConfig({
+      mode: "token",
+      tokenHash: initial.tokenHash,
+      tokenPrefix: initial.tokenPrefix,
+    }),
+  );
+  onTestFinished(async () => {
+    await rm(fixture.baseDir, { recursive: true, force: true });
+  });
+
+  const saved = await httpPut(
+    fixture.port,
+    "/api/web-access/config",
+    JSON.stringify({ mode: "token", externalBaseUrl: "", regenerate: true }),
+    { Authorization: `Bearer ${initial.token}`, "X-Zcode-Device": TEST_DEVICE },
+  );
+  assert.equal(saved.status, 200);
+  const savedBody = JSON.parse(saved.body) as { token?: string; accessUrl?: string };
+  // 回退链（建议网卡 > 回环）必须兜住：没有基址也要给出可扫的链接，
+  // 否则手机弹窗只能反复要求「重新生成」。
+  assert.match(savedBody.accessUrl ?? "", /^http:\/\/.+\/#token=.+&device=test-host$/);
+  assert.ok(savedBody.accessUrl?.includes(`#token=${savedBody.token}&device=test-host`));
+});
+
+test("代理识别：携带 CF 头的请求不能当作 loopback（写接口防绕过）", () => {
+  assert.equal(isProxiedRequest({ "cf-connecting-ip": "203.0.113.9" }), true);
+  assert.equal(isProxiedRequest({ "cf-ray": "abc-ARN" }), true);
+  assert.equal(isProxiedRequest({ "x-forwarded-for": "198.51.100.7" }), true);
+  assert.equal(isProxiedRequest({ host: "127.0.0.1:30330" }), false);
+  assert.equal(
+    resolveAuthFailureKey({ "cf-connecting-ip": "203.0.113.9" }, "127.0.0.1"),
+    "203.0.113.9",
+  );
+  assert.equal(resolveAuthFailureKey({ "x-forwarded-for": "198.51.100.7, 10.0.0.1" }, "127.0.0.1"), "198.51.100.7");
+  assert.equal(resolveAuthFailureKey({}, "192.168.1.5"), "192.168.1.5");
+});
+
+test("token 档：经 Cloudflare/反代转发的写接口一律 403（remoteAddress 是回环也不能放行）", async () => {
+  const initial = generateWebAccessToken();
+  const fixture = await startFixture(
+    makeConfig({ mode: "token", tokenHash: initial.tokenHash, tokenPrefix: initial.tokenPrefix }),
+  );
+  isolateConfigDir(fixture.baseDir);
+  await seedConfigFile(
+    fixture.baseDir,
+    makeConfig({ mode: "token", tokenHash: initial.tokenHash, tokenPrefix: initial.tokenPrefix }),
+  );
+  onTestFinished(async () => {
+    await rm(fixture.baseDir, { recursive: true, force: true });
+  });
+
+  const proxiedWrite = await httpPut(
+    fixture.port,
+    "/api/web-access/config",
+    JSON.stringify({ mode: "token", externalBaseUrl: "" }),
+    {
+      Authorization: `Bearer ${initial.token}`,
+      "X-Zcode-Device": TEST_DEVICE,
+      "CF-Connecting-IP": "203.0.113.9",
+    },
+  );
+  assert.equal(proxiedWrite.status, 403);
+
+  // 读接口仍允许远程凭据访问（token 档远程只读语义不因隧道改变）。
+  const proxiedRead = await httpGet(fixture.port, "/api/web-access/config", {
+    Authorization: `Bearer ${initial.token}`,
+    "X-Zcode-Device": TEST_DEVICE,
+    "CF-Connecting-IP": "203.0.113.9",
+  });
+  assert.equal(proxiedRead.status, 200);
+});
+
+test("失败限流：同一客户端 10 次 401 后返回 429，其他客户端不受影响", async () => {
+  const initial = generateWebAccessToken();
+  const fixture = await startFixture(
+    makeConfig({ mode: "token", tokenHash: initial.tokenHash, tokenPrefix: initial.tokenPrefix }),
+  );
+  const statuses: Array<number | undefined> = [];
+  for (let attempt = 0; attempt < 11; attempt += 1) {
+    const response = await httpGet(fixture.port, "/api/web-access/config", {
+      "CF-Connecting-IP": "203.0.113.9",
+    });
+    statuses.push(response.status);
+  }
+  assert.deepEqual(statuses.slice(0, 10), Array(10).fill(401));
+  assert.equal(statuses[10], 429);
+
+  const otherClient = await httpGet(fixture.port, "/api/web-access/config", {
+    "CF-Connecting-IP": "198.51.100.7",
+  });
+  assert.equal(otherClient.status, 401);
+});
+
+test("AuthFailureLimiter：窗口滑动后解除封禁，reset 立即解除", () => {
+  let now = 0;
+  const limiter = new AuthFailureLimiter({ maxFailures: 2, windowMs: 1_000, now: () => now });
+  limiter.noteFailure("k");
+  assert.equal(limiter.isBlocked("k"), false);
+  limiter.noteFailure("k");
+  assert.equal(limiter.isBlocked("k"), true);
+  now += 1_001;
+  assert.equal(limiter.isBlocked("k"), false);
+
+  limiter.noteFailure("k");
+  limiter.noteFailure("k");
+  limiter.reset("k");
+  assert.equal(limiter.isBlocked("k"), false);
 });

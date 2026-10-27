@@ -85,7 +85,10 @@ import type {
   WebRemoteAccessSaveRequest,
   WebRemoteAccessSaveResponse,
   WebRemoteAccessConfigSnapshot,
+  WebRemoteAccessStatus,
   WebAccessInterfaceOption,
+  CloudflaredDetection,
+  QuickTunnelStatus,
   ConfigureFinalArmsCustomEventE2ERequest,
   FinalArmsCustomEventE2EEntry,
 } from "@zcode/shared";
@@ -917,6 +920,17 @@ contextBridge.exposeInMainWorld("zcode", {
       ipcRenderer.invoke(PlatformChannels.WebAccessSaveConfig, payload),
     getInterfaces: (): Promise<WebAccessInterfaceOption[]> =>
       ipcRenderer.invoke(PlatformChannels.WebAccessGetInterfaces),
+    detectCloudflared: (): Promise<CloudflaredDetection> =>
+      ipcRenderer.invoke(PlatformChannels.WebAccessDetectCloudflared),
+    restartTunnel: (): Promise<WebRemoteAccessStatus> =>
+      ipcRenderer.invoke(PlatformChannels.WebAccessRestartTunnel),
+    onTunnelStatusChanged: (listener: (status: QuickTunnelStatus) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: QuickTunnelStatus) => {
+        listener(status);
+      };
+      ipcRenderer.on(PlatformChannels.WebAccessTunnelStatusChanged, handler);
+      return () => ipcRenderer.removeListener(PlatformChannels.WebAccessTunnelStatusChanged, handler);
+    },
   },
 });
 
