@@ -1,6 +1,6 @@
 {
   "name": "zcode",
-  "version": "3.100.15",
+  "version": "3.100.16",
   "private": true,
   "type": "module",
   "scripts": {
