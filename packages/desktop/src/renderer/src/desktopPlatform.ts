@@ -2,9 +2,12 @@ import { recordArmsCustomEventForE2E } from "@zcode/ui";
 import {
   DesktopCommandIds,
   buildLocalMediaPreviewUrl,
+  type CloudflaredDetection,
   type IPlatformService,
+  type QuickTunnelStatus,
   type WebRemoteAccessSaveRequest,
   type WebRemoteAccessSaveResponse,
+  type WebRemoteAccessStatus,
   type WebRemoteAccessConfigSnapshot,
   type WebAccessInterfaceOption,
 } from "@zcode/shared";
@@ -17,6 +20,10 @@ type ZCodeWebRemoteAccessBridge = {
   getConfig(): Promise<WebRemoteAccessConfigSnapshot>;
   saveConfig(payload: WebRemoteAccessSaveRequest): Promise<WebRemoteAccessSaveResponse>;
   getInterfaces(): Promise<WebAccessInterfaceOption[]>;
+  /** 以下三个为临时通道（Cloudflare Quick Tunnel）新增方法：旧 preload 未暴露，需可选探测。 */
+  detectCloudflared?(): Promise<CloudflaredDetection>;
+  restartTunnel?(): Promise<WebRemoteAccessStatus>;
+  onTunnelStatusChanged?(listener: (status: QuickTunnelStatus) => void): () => void;
 };
 
 function resolveWebRemoteAccessBridge(): ZCodeWebRemoteAccessBridge | undefined {
@@ -219,6 +226,17 @@ export function createDesktopPlatform(options: {
           getConfig: () => resolveWebRemoteAccessBridge()!.getConfig(),
           saveConfig: (payload) => resolveWebRemoteAccessBridge()!.saveConfig(payload),
           getInterfaces: () => resolveWebRemoteAccessBridge()!.getInterfaces(),
+          // 临时通道三方法：旧 preload 未暴露时按「能力不可用」降级，不崩区域——
+          // 检测返回不可用、重启以明确错误 reject（UI 已有 try/catch + toast）、
+          // 订阅返回空取消函数。
+          detectCloudflared: () =>
+            resolveWebRemoteAccessBridge()!.detectCloudflared?.() ??
+            Promise.resolve({ available: false }),
+          restartTunnel: () =>
+            resolveWebRemoteAccessBridge()!.restartTunnel?.() ??
+            Promise.reject(new Error("tunnel control requires an updated app")),
+          onTunnelStatusChanged: (listener) =>
+            resolveWebRemoteAccessBridge()!.onTunnelStatusChanged?.(listener) ?? (() => {}),
         }
       : undefined,
   };
