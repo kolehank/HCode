@@ -24,6 +24,7 @@ import { RemoteAccessTokenReveal } from "@/settings/RemoteAccessTokenReveal.js";
 import { RemoteAccessTunnelSection } from "@/settings/RemoteAccessTunnelSection.js";
 import {
   createDesktopRemoteAccessAdapter,
+  rebaseAccessUrl,
   createWebRemoteAccessAdapter,
   type WebAccessInterfaceItem,
   type WebAccessMode,
@@ -99,6 +100,9 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
   const [webStaticConfigured, setWebStaticConfigured] = useState(true);
   const [quickTunnelEnabled, setQuickTunnelEnabled] = useState(false);
   const [tunnel, setTunnel] = useState<QuickTunnelStatus>({ state: "disabled" });
+  // token 档完整访问链接缓存（含明文 + device）：来自 load/save 的 IPC 快照，
+  // 应用重启后为空（明文只在 main 内存）；通道运行时用 rebaseAccessUrl 换到通道域名上。
+  const [cachedAccessUrl, setCachedAccessUrl] = useState<string | null>(null);
   const [cloudflared, setCloudflared] = useState<CloudflaredDetection | null>(null);
   const [detectingCloudflared, setDetectingCloudflared] = useState(false);
   const [restartingTunnel, setRestartingTunnel] = useState(false);
@@ -141,6 +145,7 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
         if (result.tunnel) {
           setTunnel(result.tunnel);
         }
+        setCachedAccessUrl(result.accessUrl ?? null);
         if (result.desktopEnabled !== undefined) {
           setDesktopEnabled(result.desktopEnabled);
         }
@@ -269,6 +274,7 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
         if (result.tunnel) {
           setTunnel(result.tunnel);
         }
+        setCachedAccessUrl(result.accessUrl ?? null);
         // 保存后同步实际监听端口：加载时 server 未运行 port 为 0，「服务端口」
         // 不显示、网卡联动失效；desktop 保存即时重建监听，port 回来后要刷新。
         if (result.port !== undefined) {
@@ -465,6 +471,11 @@ export function RemoteAccessSection({ isDesktop }: { isDesktop: boolean }) {
           enabled={quickTunnelEnabled}
           mode={mode}
           tunnel={tunnel}
+          fullUrl={
+            tunnel.state === "running" && tunnel.publicUrl && cachedAccessUrl
+              ? rebaseAccessUrl(cachedAccessUrl, tunnel.publicUrl)
+              : undefined
+          }
           detection={cloudflared}
           detecting={detectingCloudflared}
           restarting={restartingTunnel}

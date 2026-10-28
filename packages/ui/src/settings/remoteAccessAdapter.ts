@@ -43,6 +43,11 @@ export interface RemoteAccessLoadResult {
   webStaticConfigured?: boolean;
   /** 仅桌面 adapter 返回：临时公网通道状态（URL 仅本进程内存，不落盘）。 */
   tunnel?: QuickTunnelStatus;
+  /**
+   * 仅桌面 adapter 返回：token 档的完整访问链接（含明文 token + device，回退链已按
+   * 当前通道地址取基）。只经 IPC：不落盘、不出任何 HTTP 响应；应用重启后为空。
+   */
+  accessUrl?: string;
 }
 
 export interface RemoteAccessSavePayload {
@@ -74,6 +79,12 @@ export interface RemoteAccessSaveResult {
 export interface RemoteAccessAdapter {
   load(): Promise<RemoteAccessLoadResult>;
   save(payload: RemoteAccessSavePayload): Promise<RemoteAccessSaveResult>;
+}
+
+/** 通道重启后只换域名：保留原链接的 #token=&device= 片段，避免展示已失效的旧公网地址。 */
+export function rebaseAccessUrl(accessUrl: string, baseUrl: string): string {
+  const hashIndex = accessUrl.indexOf("#");
+  return hashIndex >= 0 ? `${baseUrl}${accessUrl.slice(hashIndex)}` : accessUrl;
 }
 
 export function createWebRemoteAccessAdapter(): RemoteAccessAdapter {
@@ -148,6 +159,7 @@ export function createDesktopRemoteAccessAdapter(
         desktopEnabled: status.enabled,
         webStaticConfigured: snapshot.webStaticConfigured,
         tunnel: status.tunnel,
+        ...(snapshot.accessUrl ? { accessUrl: snapshot.accessUrl } : {}),
       };
     },
     async save(payload) {

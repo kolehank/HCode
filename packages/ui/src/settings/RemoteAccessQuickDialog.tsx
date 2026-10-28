@@ -19,6 +19,7 @@ import { usePlatform } from "@/hooks/usePlatform.js";
 import { useTabStoreApi } from "@/store/TabStoreProvider.js";
 import { logger } from "@/logger.js";
 import { QrCode } from "@/settings/QrCode.js";
+import { rebaseAccessUrl } from "@/settings/remoteAccessAdapter.js";
 import { toast } from "@/components/ui/toast.js";
 import { setPendingSettingsSectionIntent } from "@/lib/settingsNavigation.js";
 import {
@@ -47,12 +48,6 @@ const INITIAL_STATE: QuickAccessState = {
   regeneratedUrl: null,
   errorDetail: null,
 };
-
-/** 通道重启后只换域名：保留原链接的 #token= 片段，避免展示已失效的旧公网地址。 */
-function rebaseAccessUrl(accessUrl: string, baseUrl: string): string {
-  const hashIndex = accessUrl.indexOf("#");
-  return hashIndex >= 0 ? `${baseUrl}${accessUrl.slice(hashIndex)}` : accessUrl;
-}
 
 export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComponent({
   open,
@@ -123,9 +118,7 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
       return;
     }
     return bridge.onTunnelStatusChanged((tunnel) => {
-      setState((prev) =>
-        prev.status ? { ...prev, status: { ...prev.status, tunnel } } : prev,
-      );
+      setState((prev) => (prev.status ? { ...prev, status: { ...prev.status, tunnel } } : prev));
     });
   }, [open, platform]);
 
@@ -227,8 +220,7 @@ export const RemoteAccessQuickDialog = memo(function RemoteAccessQuickDialogComp
         : tokenLink
       : displayBaseUrl;
   // 基址为空且没有公网通道时，二维码内容来自回退链（建议网卡/回环），必须提示「仅展示、不落盘」。
-  const isFallbackUrl =
-    Boolean(accessUrl) && !status?.externalBaseUrl.trim() && !tunnelUrl;
+  const isFallbackUrl = Boolean(accessUrl) && !status?.externalBaseUrl.trim() && !tunnelUrl;
   const tunnelStarting = status?.quickTunnelEnabled && status.tunnel.state === "starting";
   const tunnelFailed = status?.quickTunnelEnabled && status.tunnel.state === "error";
 

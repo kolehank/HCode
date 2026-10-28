@@ -15,6 +15,11 @@ export interface RemoteAccessTunnelSectionProps {
   enabled: boolean;
   mode: WebAccessMode;
   tunnel: QuickTunnelStatus;
+  /**
+   * 含明文 token + device 的完整访问链接（父组件由 IPC 快照缓存 rebase 到通道域名）。
+   * 缺席时（应用重启后明文不在内存）展示/复制退回裸 publicUrl，需手动拼 token。
+   */
+  fullUrl?: string;
   detection: CloudflaredDetection | null;
   detecting: boolean;
   restarting: boolean;
@@ -28,6 +33,7 @@ export function RemoteAccessTunnelSection({
   enabled,
   mode,
   tunnel,
+  fullUrl,
   detection,
   detecting,
   restarting,
@@ -40,16 +46,18 @@ export function RemoteAccessTunnelSection({
   const formatMessage = useCallback((id: string) => intl.formatMessage({ id }), [intl]);
 
   const copyUrl = useCallback(async () => {
-    if (!tunnel.publicUrl) {
+    // 优先完整链接（#token=&device= 在 fragment，不进代理/访问日志）；无缓存明文时退回裸地址。
+    const value = fullUrl ?? tunnel.publicUrl;
+    if (!value) {
       return;
     }
     try {
-      await navigator.clipboard.writeText(tunnel.publicUrl);
+      await navigator.clipboard.writeText(value);
       toast(formatMessage("settings.remoteAccess.copied"));
     } catch {
       toast(formatMessage("settings.remoteAccess.copyFailed"));
     }
-  }, [formatMessage, tunnel.publicUrl]);
+  }, [formatMessage, fullUrl, tunnel.publicUrl]);
 
   const requiresToken = mode !== "token";
 
@@ -116,7 +124,7 @@ export function RemoteAccessTunnelSection({
             {tunnel.state === "running" && tunnel.publicUrl ? (
               <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1 break-all rounded-md bg-surface px-3 py-2 font-mono text-ui-xs text-foreground-subtle">
-                  {tunnel.publicUrl}
+                  {fullUrl ?? tunnel.publicUrl}
                 </div>
                 <Button
                   type="button"
