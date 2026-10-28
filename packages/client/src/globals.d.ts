@@ -81,9 +81,10 @@ declare global {
         options: RemoteTarget,
         requestId?: string,
         context?: {
-          workspacePath: string;
+          workspacePath?: string;
           workspaceIdentity?: string;
           connectTrigger?: import("@zcode/shared").RemoteWorkspaceConnectTrigger;
+          confirmSourceServerInstall?: boolean;
         },
       ): Promise<{ success: boolean; error?: string; sessionId?: string }>;
       requestSourceSettingsAttachment?(sourceServerId: string): Promise<{ attachmentId: string }>;
@@ -309,7 +310,7 @@ declare global {
         remoteSessionId?: string;
         sessionId?: string;
         residencyGeneration?: number;
-      }): Promise<void>;
+      }): Promise<import("@zcode/shared").BrowserGuestAttachResult>;
       /** 重建 `<webview>` 前让 main 精确断开旧 guest 的 CDP。 */
       browserViewDetachGuest?(payload: { key: string; webContentsId: number }): Promise<boolean>;
       browserViewCloseTab?(payload: BrowserViewCloseTabRequest): Promise<void>;
@@ -388,6 +389,52 @@ declare global {
       getSystemLocale?(): Promise<Locale>;
       /** 同步标题栏亮暗色 */
       setTitleBarTheme(theme: DesktopTitleBarTheme): Promise<void>;
+      // ---- 以下与 IPlatformService 对齐（曾长期缺失，renderer 平台桥因此游离于
+      // typecheck 之外；签名以 shared/platform.ts 的 IPlatformService 为准）----
+      /** 把传入文本落成本机临时文件附件，返回消息可引用的附件描述 */
+      createTempTextAttachment?(
+        payload: import("@zcode/shared").CreateTempTextAttachmentRequest,
+      ): Promise<import("@zcode/shared").CreateTempTextAttachmentResult>;
+      /** 读取宿主环境中的原生 MCP 用户目录配置 */
+      loadMcpFromUserDirectory?(
+        payload?: import("@zcode/shared").LoadCliMcpFromUserDirectoryRequest,
+      ): Promise<import("@zcode/shared").LoadCliMcpFromUserDirectoryResult>;
+      /** 写入宿主环境中的原生 MCP 用户目录配置 */
+      saveMcpToUserDirectory?(
+        payload: import("@zcode/shared").SaveCliMcpToUserDirectoryRequest,
+      ): Promise<{ success: boolean; error?: string }>;
+      /** 迁移旧版 Common MCP 配置 */
+      migrateLegacyCommonMcp?(
+        payload?: import("@zcode/shared").MigrateLegacyCommonMcpRequest,
+      ): Promise<import("@zcode/shared").MigrateLegacyCommonMcpResult>;
+      /** 注册 main 进程打开内置反馈对话框事件，返回 disposer */
+      onOpenFeedbackDialog?(handler: () => void): () => void;
+      /** 注册 main 进程打开我的工单面板事件，返回 disposer */
+      onOpenTicketsPanel?(handler: () => void): () => void;
+      /** 注册 main 进程要求关闭当前 active context 的回调，返回 disposer */
+      onCloseActiveContextRequest?(handler: () => void): () => void;
+      /** 注册分享码导入请求回调，返回 disposer */
+      onShareImport?(callback: (payload: { shareCode: string }) => void): () => void;
+      /** 通过宿主环境上报 ARMS 自定义事件 */
+      reportArmsCustomEvent(payload: import("@zcode/shared").ArmsCustomEventPayload): Promise<void>;
+      /** 上报本地 TTFT 批次（单向 send，Main 不回执） */
+      reportLocalTtftBatch?(batch: import("@zcode/shared").LocalTtftBatch): void;
+      /** 注册 main 进程快捷键录制状态同步回调（无 disposer） */
+      setShortcutRecordingActive?(active: boolean): void;
+      /** 订阅远程 workspace session 重连事件，返回 disposer */
+      onRemoteSessionReconnected?(
+        handler: (event: import("@zcode/shared").RemoteSessionReconnectedEvent) => void,
+      ): () => void;
+      /** 同步读取当前原生窗口控制区安全边距；首屏启动态可能为 null */
+      getWindowControlsOverlayMetrics?():
+        | import("@zcode/shared").WindowControlsOverlayMetrics
+        | null;
+      /** 注册原生窗口控制区安全边距变化回调，返回 disposer */
+      onWindowControlsOverlayChanged?(
+        handler: (metrics: import("@zcode/shared").WindowControlsOverlayMetrics) => void,
+      ): () => void;
+      /** 读取 zcode stdio tap 的开发态配置 */
+      getZCodeStdioTapDevState?(): Promise<import("@zcode/shared").ZCodeStdioTapDevState>;
     };
   }
 }

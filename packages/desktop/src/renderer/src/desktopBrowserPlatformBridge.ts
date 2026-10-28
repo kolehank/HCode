@@ -27,7 +27,7 @@ type DesktopBrowserPlatformBridge = Pick<
 // Rebase 集成：browser bridge 若继续内联在 renderer 入口，会让入口越过 max-lines 门禁。
 // 独立对象只做 preload 委托与旧 bridge 兼容兜底，不持有 Browser 业务状态。
 export const desktopBrowserPlatformBridge = {
-  getPathForFile: (file) => window.zcode.getPathForFile?.(file) ?? null,
+  getPathForFile: (file: File) => window.zcode.getPathForFile?.(file) ?? null,
   saveFile: (payload) =>
     window.zcode.saveFile?.(payload) ?? Promise.resolve({ success: false, error: "not_supported" }),
   // 条件定义而非兜底返回失败：UI 靠方法是否存在做能力检测，旧 preload 下必须保持 undefined
@@ -69,7 +69,7 @@ export const desktopBrowserPlatformBridge = {
         originsSkipped: 0,
         originsFailed: 0,
       },
-      error: "unsupported",
+      error: "chrome_browser_data_import_unavailable",
     }),
   clearEmbeddedBrowserData: (mode) =>
     window.zcode.clearEmbeddedBrowserData?.(mode) ??

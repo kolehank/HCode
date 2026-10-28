@@ -7,7 +7,11 @@
     "jsx": "react-jsx",
     "noEmit": true
   },
+  "files": ["../client/src/globals.d.ts"],
   "include": ["src/renderer"],
+  // co-located 测试用 node:fs/promises、node:vm、setImmediate（浏览器工程的 lib/types
+  // 不含 node 全局）；测试与 packages/desktop/test 一样仅由 vitest 运行，不进类型程序。
+  "exclude": ["src/renderer/**/*.test.ts"],
   // renderer 直接 import 了 shared；把它补进 references，避免 renderer 单独检查时再走源码回退路径。
   "references": [{ "path": "../shared" }, { "path": "../ui" }, { "path": "../client" }]
 }

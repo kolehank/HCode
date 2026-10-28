@@ -3,8 +3,13 @@ import {
   DesktopCommandIds,
   buildLocalMediaPreviewUrl,
   type CloudflaredDetection,
+  type CreateTempTextAttachmentRequest,
   type IPlatformService,
+  type LoadCliMcpFromUserDirectoryRequest,
+  type LocalTtftBatch,
+  type MigrateLegacyCommonMcpRequest,
   type QuickTunnelStatus,
+  type SaveCliMcpToUserDirectoryRequest,
   type WebRemoteAccessSaveRequest,
   type WebRemoteAccessSaveResponse,
   type WebRemoteAccessStatus,
@@ -45,7 +50,32 @@ export function createDesktopPlatform(options: {
     selectDirectories: () => window.zcode.selectDirectories(),
     selectFile: () => window.zcode.selectFile(),
     selectFiles: () => window.zcode.selectFiles?.() ?? Promise.resolve([]),
-    createTempTextAttachment: (payload) => window.zcode.createTempTextAttachment(payload),
+    // 以下四个能力在 IPlatformService 中可选（旧 preload 未暴露）：条件定义，
+    // UI 靠方法是否存在做能力检测，不得用恒存在的降级实现谎报能力。
+    ...(window.zcode.createTempTextAttachment
+      ? {
+          createTempTextAttachment: (payload: CreateTempTextAttachmentRequest) =>
+            window.zcode.createTempTextAttachment!(payload),
+        }
+      : {}),
+    ...(window.zcode.loadMcpFromUserDirectory
+      ? {
+          loadMcpFromUserDirectory: (payload?: LoadCliMcpFromUserDirectoryRequest) =>
+            window.zcode.loadMcpFromUserDirectory!(payload),
+        }
+      : {}),
+    ...(window.zcode.saveMcpToUserDirectory
+      ? {
+          saveMcpToUserDirectory: (payload: SaveCliMcpToUserDirectoryRequest) =>
+            window.zcode.saveMcpToUserDirectory!(payload),
+        }
+      : {}),
+    ...(window.zcode.migrateLegacyCommonMcp
+      ? {
+          migrateLegacyCommonMcp: (payload?: MigrateLegacyCommonMcpRequest) =>
+            window.zcode.migrateLegacyCommonMcp!(payload),
+        }
+      : {}),
     materializeWorkflowArtifactFile: (payload) =>
       window.zcode.materializeWorkflowArtifactFile(payload),
     onRemoteConnectionLog: (handler) => window.zcode.onRemoteConnectionLog(handler),
@@ -70,9 +100,6 @@ export function createDesktopPlatform(options: {
     listWSLDistros: () => window.zcode.listWSLDistros(),
     listDockerContainers: () => window.zcode.listDockerContainers(),
     listSSHConfigAliases: () => window.zcode.listSSHConfigAliases(),
-    loadMcpFromUserDirectory: (payload) => window.zcode.loadMcpFromUserDirectory(payload),
-    saveMcpToUserDirectory: (payload) => window.zcode.saveMcpToUserDirectory(payload),
-    migrateLegacyCommonMcp: (payload) => window.zcode.migrateLegacyCommonMcp(payload),
     openExternal: (url) => window.zcode.openExternal(url),
     openFeedback: () => window.zcode.executeDesktopCommand(DesktopCommandIds.OpenFeedback),
     openCommunity: () => window.zcode.executeDesktopCommand(DesktopCommandIds.OpenCommunity),
@@ -110,7 +137,9 @@ export function createDesktopPlatform(options: {
     onRendererActionTraceConfigChanged: window.zcode.onRendererActionTraceConfigChanged
       ? (callback) => window.zcode.onRendererActionTraceConfigChanged!(callback)
       : undefined,
-    reportLocalTtftBatch: (batch) => window.zcode.reportLocalTtftBatch(batch),
+    reportLocalTtftBatch: window.zcode.reportLocalTtftBatch
+      ? (batch: LocalTtftBatch) => window.zcode.reportLocalTtftBatch!(batch)
+      : undefined,
     reportRendererActionTraceBatch: window.zcode.reportRendererActionTraceBatch
       ? (batch) => window.zcode.reportRendererActionTraceBatch!(batch)
       : undefined,
